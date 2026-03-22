@@ -70,7 +70,7 @@ pip install -r requirements.txt
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | host | 服务端监听地址 | 0.0.0.0 |
-| port | 服务端监听端口 | 7365 |
+| port | 服务端监听端口 | 7381 |
 
 **注意**：如果 AstrBot 部署在云服务器上，需要在安全组/防火墙中开放配置的端口。
 
@@ -85,18 +85,31 @@ pip install -r requirements.txt
 ```
 
 3. 启动控制端（连接到 AstrBot 服务器）：
+
+**方式一：使用 IP + 端口（无域名代理）**
 ```bash
-python controller_client.py --server <AstrBot服务器公网IP> --port 7365
+python controller_client.py --server <AstrBot服务器公网IP> --port 7381
 ```
 
 例如：
 ```bash
-python controller_client.py --server 123.45.67.89 --port 7365
+python controller_client.py --server 123.45.67.89 --port 7381
+```
+
+**方式二：使用域名（有 Nginx 代理）**
+```bash
+python controller_client.py --server your-domain.com
+```
+
+**方式三：使用域名 + SSL**
+```bash
+python controller_client.py --server your-domain.com --ssl
 ```
 
 **启动参数说明**：
-- `--server` 或 `-s`: AstrBot 服务器的公网 IP 地址（必填）
-- `--port` 或 `-p`: 服务器端口（默认：7365）
+- `--server` 或 `-s`: AstrBot 服务器地址（IP、域名或 ws:// 完整 URL，必填）
+- `--port` 或 `-p`: 服务器端口（IP 连接时必填，域名代理时可省略）
+- `--ssl`: 使用 wss:// 加密连接（可选）
 
 ### 4. 使用 PyInstaller 打包（可选）
 
@@ -109,7 +122,14 @@ pyinstaller --onefile --name WindowsController controller_client.py
 
 打包后，使用方式：
 ```bash
-WindowsController.exe --server 123.45.67.89 --port 7365
+# IP 连接
+WindowsController.exe --server 123.45.67.89 --port 7381
+
+# 域名连接
+WindowsController.exe --server your-domain.com
+
+# 域名 + SSL
+WindowsController.exe --server your-domain.com --ssl
 ```
 
 ## LLM 工具调用
@@ -169,11 +189,16 @@ WindowsController.exe --server 123.45.67.89 --port 7365
 
 ## 网络配置
 
-确保 AstrBot 服务器的防火墙/安全组已开放插件端口（默认 7365）。
+确保 AstrBot 服务器的防火墙/安全组已开放插件端口（默认 7381）。
 
-本地控制端使用服务器公网 IP 连接：
+**使用 IP 直连：**
 ```bash
-python controller_client.py --server 123.45.67.89 --port 7365
+python controller_client.py --server 123.45.67.89 --port 7381
+```
+
+**使用域名代理（Nginx）：**
+```bash
+python controller_client.py --server your-domain.com
 ```
 
 ## 安全注意事项

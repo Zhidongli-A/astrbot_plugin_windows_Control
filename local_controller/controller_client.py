@@ -23,7 +23,7 @@ from screen_capture import ScreenCapture
 class LocalControllerClient:
     """本地控制端客户端 - 主动连接服务器"""
     
-    def __init__(self, server_host: str, server_port: int = 7381, use_ssl: bool = False):
+    def __init__(self, server_host: str, server_port: int = None, use_ssl: bool = False):
         self.server_host = server_host
         self.server_port = server_port
         self.use_ssl = use_ssl
@@ -35,7 +35,11 @@ class LocalControllerClient:
             self.use_ssl = server_host.startswith('wss://')
         else:
             protocol = 'wss' if use_ssl else 'ws'
-            self.server_uri = f"{protocol}://{server_host}:{server_port}"
+            # 使用域名代理时不需要端口（使用默认80/443），IP连接时需要端口
+            if server_port:
+                self.server_uri = f"{protocol}://{server_host}:{server_port}"
+            else:
+                self.server_uri = f"{protocol}://{server_host}"
         
         self.websocket = None
         self.connected = False
@@ -310,8 +314,8 @@ async def main():
     
     parser = argparse.ArgumentParser(description="Windows 本地控制端 - 客户端模式")
     parser.add_argument("--server", "-s", required=True, help="AstrBot 服务器地址（IP、域名或ws://完整URL）")
-    parser.add_argument("--port", "-p", type=int, default=7381, help="服务器端口 (默认: 7381)")
-    parser.add_argument("--ssl", action="store_true", help="使用 wss:// 加密连接")
+    parser.add_argument("--port", "-p", type=int, default=None, help="服务器端口（使用域名代理时可省略，IP连接时必填）")
+    parser.add_argument("--ssl", action="store_true", help="使用 wss:// 加密连接（域名代理时自动使用443端口）")
     args = parser.parse_args()
     
     client = LocalControllerClient(server_host=args.server, server_port=args.port, use_ssl=args.ssl)
