@@ -70,7 +70,7 @@ pip install -r requirements.txt
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | host | 服务端监听地址 | 0.0.0.0 |
-| port | 服务端监听端口 | 8765 |
+| port | 服务端监听端口 | 7365 |
 
 **注意**：如果 AstrBot 部署在云服务器上，需要在安全组/防火墙中开放配置的端口。
 
@@ -86,17 +86,17 @@ pip install -r requirements.txt
 
 3. 启动控制端（连接到 AstrBot 服务器）：
 ```bash
-python controller_client.py --server <AstrBot服务器公网IP> --port 8765
+python controller_client.py --server <AstrBot服务器公网IP> --port 7365
 ```
 
 例如：
 ```bash
-python controller_client.py --server 123.45.67.89 --port 8765
+python controller_client.py --server 123.45.67.89 --port 7365
 ```
 
 **启动参数说明**：
 - `--server` 或 `-s`: AstrBot 服务器的公网 IP 地址（必填）
-- `--port` 或 `-p`: 服务器端口（默认：8765）
+- `--port` 或 `-p`: 服务器端口（默认：7365）
 
 ### 4. 使用 PyInstaller 打包（可选）
 
@@ -109,7 +109,7 @@ pyinstaller --onefile --name WindowsController controller_client.py
 
 打包后，使用方式：
 ```bash
-WindowsController.exe --server 123.45.67.89 --port 8765
+WindowsController.exe --server 123.45.67.89 --port 7365
 ```
 
 ## LLM 工具调用
@@ -169,11 +169,11 @@ WindowsController.exe --server 123.45.67.89 --port 8765
 
 ## 网络配置
 
-确保 AstrBot 服务器的防火墙/安全组已开放插件端口（默认 8765）。
+确保 AstrBot 服务器的防火墙/安全组已开放插件端口（默认 7365）。
 
 本地控制端使用服务器公网 IP 连接：
 ```bash
-python controller_client.py --server 123.45.67.89 --port 8765
+python controller_client.py --server 123.45.67.89 --port 7365
 ```
 
 ## 安全注意事项

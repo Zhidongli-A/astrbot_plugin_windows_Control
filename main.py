@@ -32,7 +32,7 @@ class ControllerClient:
 class ControllerServer:
     """控制端服务端 - 等待本地控制端连接"""
     
-    def __init__(self, host: str = "0.0.0.0", port: int = 8765):
+    def __init__(self, host: str = "0.0.0.0", port: int = 7365):
         self.host = host
         self.port = port
         self.clients: Dict[str, ControllerClient] = {}
