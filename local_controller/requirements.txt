@@ -1,0 +1,10 @@
+# Windows 本地控制端依赖
+
+# 鼠标键盘控制
+pyautogui>=0.9.54
+
+# 图像处理
+Pillow>=10.0.0
+
+# WebSocket 服务
+websockets>=11.0.0
