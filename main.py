@@ -211,7 +211,7 @@ class WindowsControlPlugin(Star):
         self.context = context
         self.controller_server: Optional[ControllerServer] = None
         self.server_host = "0.0.0.0"
-        self.server_port = 8765
+        self.server_port = 7365
         
     async def initialize(self):
         """插件初始化"""
@@ -220,7 +220,7 @@ class WindowsControlPlugin(Star):
         plugin_config = config.get("windows_control", {})
         
         self.server_host = plugin_config.get("host", "0.0.0.0")
-        self.server_port = plugin_config.get("port", 8765)
+        self.server_port = plugin_config.get("port", 7365)
         
         # 初始化服务端
         self.controller_server = ControllerServer(

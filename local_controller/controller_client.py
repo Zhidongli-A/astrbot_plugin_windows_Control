@@ -23,7 +23,7 @@ from screen_capture import ScreenCapture
 class LocalControllerClient:
     """本地控制端客户端 - 主动连接服务器"""
     
-    def __init__(self, server_host: str, server_port: int = 8765):
+    def __init__(self, server_host: str, server_port: int = 7365):
         self.server_host = server_host
         self.server_port = server_port
         self.server_uri = f"ws://{server_host}:{server_port}"
@@ -300,7 +300,7 @@ async def main():
     
     parser = argparse.ArgumentParser(description="Windows 本地控制端 - 客户端模式")
     parser.add_argument("--server", "-s", required=True, help="AstrBot 服务器地址（公网IP或域名）")
-    parser.add_argument("--port", "-p", type=int, default=8765, help="服务器端口 (默认: 8765)")
+    parser.add_argument("--port", "-p", type=int, default=7365, help="服务器端口 (默认: 7365)")
     args = parser.parse_args()
     
     client = LocalControllerClient(server_host=args.server, server_port=args.port)
