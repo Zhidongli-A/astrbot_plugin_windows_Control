@@ -32,7 +32,7 @@ class ControllerClient:
 class ControllerServer:
     """控制端服务端 - 等待本地控制端连接"""
     
-    def __init__(self, host: str = "0.0.0.0", port: int = 7381):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
         self.clients: Dict[str, ControllerClient] = {}
@@ -40,40 +40,29 @@ class ControllerServer:
         self.running = False
         
     async def start(self):
-        """启动服务端，如果端口被占用则自动尝试其他端口"""
+        """启动服务端"""
         self.running = True
         
-        # 尝试绑定端口，如果被占用则尝试下一个
-        max_attempts = 10
-        original_port = self.port
-        
-        for attempt in range(max_attempts):
-            try:
-                logger.info(f"Windows 控制服务端启动: {self.host}:{self.port}")
-                
-                self.server = await websockets.serve(
-                    self.handle_client,
-                    self.host,
-                    self.port,
-                    ping_interval=20,
-                    ping_timeout=10
-                )
-                
-                if self.port != original_port:
-                    logger.warning(f"端口 {original_port} 被占用，已自动切换到端口 {self.port}")
-                
-                logger.info("等待本地控制端连接...")
-                return True
-                
-            except OSError as e:
-                if "address already in use" in str(e).lower():
-                    self.port += 1
-                    logger.warning(f"端口 {self.port - 1} 被占用，尝试端口 {self.port}")
-                else:
-                    raise e
-        
-        logger.error(f"无法找到可用端口（尝试了 {original_port} 到 {self.port}）")
-        return False
+        try:
+            logger.info(f"Windows 控制服务端启动: {self.host}:{self.port}")
+            
+            self.server = await websockets.serve(
+                self.handle_client,
+                self.host,
+                self.port,
+                ping_interval=20,
+                ping_timeout=10
+            )
+            
+            logger.info("等待本地控制端连接...")
+            return True
+            
+        except OSError as e:
+            if "address already in use" in str(e).lower():
+                logger.error(f"端口 {self.port} 已被占用，请修改配置或关闭占用该端口的程序")
+            else:
+                logger.error(f"启动服务端失败: {str(e)}")
+            return False
         
     async def stop(self):
         """停止服务端"""
@@ -202,7 +191,7 @@ class ControllerServer:
         return len(self.clients) > 0
 
 
-@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "2.0.0")
+@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "1.00")
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
     
@@ -210,8 +199,8 @@ class WindowsControlPlugin(Star):
         super().__init__(context)
         self.context = context
         self.controller_server: Optional[ControllerServer] = None
-        self.server_host = "0.0.0.0"
-        self.server_port = 7381
+        self.server_host = None
+        self.server_port = None
         
     async def initialize(self):
         """插件初始化"""
@@ -219,8 +208,16 @@ class WindowsControlPlugin(Star):
         config = self.context.get_config()
         plugin_config = config.get("windows_control", {})
         
-        self.server_host = plugin_config.get("host", "0.0.0.0")
-        self.server_port = plugin_config.get("port", 7381)
+        self.server_host = plugin_config.get("host")
+        self.server_port = plugin_config.get("port")
+        
+        # 检查必要配置
+        if not self.server_host:
+            logger.error("未配置 host，请在面板中设置服务器地址")
+            return
+        if not self.server_port:
+            logger.error("未配置 port，请在面板中设置服务器端口")
+            return
         
         # 初始化服务端
         self.controller_server = ControllerServer(
@@ -232,13 +229,9 @@ class WindowsControlPlugin(Star):
         success = await self.controller_server.start()
         
         if success:
-            actual_port = self.controller_server.port
-            if actual_port != self.server_port:
-                logger.warning(f"配置端口 {self.server_port} 被占用，实际使用端口 {actual_port}")
-                logger.warning(f"请确保本地控制端连接到正确端口: {actual_port}")
-            logger.info(f"Windows 控制插件初始化完成，监听: {self.server_host}:{actual_port}")
+            logger.info(f"Windows 控制插件初始化完成，监听: {self.server_host}:{self.server_port}")
         else:
-            logger.error("Windows 控制插件启动失败：无法找到可用端口")
+            logger.error("Windows 控制插件启动失败")
         
     async def terminate(self):
         """插件销毁"""
