@@ -32,7 +32,7 @@ class ControllerClient:
 class ControllerServer:
     """控制端服务端 - 等待本地控制端连接"""
     
-    def __init__(self, host: str = "0.0.0.0", port: int = 7365):
+    def __init__(self, host: str = "0.0.0.0", port: int = 7381):
         self.host = host
         self.port = port
         self.clients: Dict[str, ControllerClient] = {}
@@ -211,7 +211,7 @@ class WindowsControlPlugin(Star):
         self.context = context
         self.controller_server: Optional[ControllerServer] = None
         self.server_host = "0.0.0.0"
-        self.server_port = 7365
+        self.server_port = 7381
         
     async def initialize(self):
         """插件初始化"""
@@ -220,7 +220,7 @@ class WindowsControlPlugin(Star):
         plugin_config = config.get("windows_control", {})
         
         self.server_host = plugin_config.get("host", "0.0.0.0")
-        self.server_port = plugin_config.get("port", 7365)
+        self.server_port = plugin_config.get("port", 7381)
         
         # 初始化服务端
         self.controller_server = ControllerServer(

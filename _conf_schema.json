@@ -9,6 +9,6 @@
     "description": "服务端监听端口",
     "type": "int",
     "hint": "服务端监听的端口号，本地控制端将连接到此端口",
-    "default": 7365
+    "default": 7381
   }
 }
