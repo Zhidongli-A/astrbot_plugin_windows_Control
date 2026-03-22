@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AstrBot Windows 远程控制插件
-提供 LLM 工具调用接口，实现远程控制 Windows 电脑
+AstrBot Windows 远程控制插件 - 服务端模式
+本地控制端主动连接到此服务端，服务端通过 WebSocket 发送命令并接收结果
 """
 
 import asyncio
@@ -10,7 +10,8 @@ import websockets
 import json
 import base64
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
+from dataclasses import dataclass, field
 
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
@@ -18,99 +19,178 @@ from astrbot.api import logger
 import astrbot.api.message_components as Comp
 
 
-class WebSocketClient:
-    """WebSocket 客户端，用于连接本地控制端"""
+@dataclass
+class ControllerClient:
+    """控制器客户端信息"""
+    websocket: websockets.WebSocketServerProtocol
+    client_id: str
+    connected_at: datetime = field(default_factory=datetime.now)
+    last_ping: datetime = field(default_factory=datetime.now)
+    is_busy: bool = False
+
+
+class ControllerServer:
+    """控制端服务端 - 等待本地控制端连接"""
     
-    def __init__(self, host: str, port: int, timeout: int = 30):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8765):
         self.host = host
         self.port = port
-        self.timeout = timeout
-        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
-        self.connected = False
-        self.reconnect_interval = 5  # 重连间隔（秒）
+        self.clients: Dict[str, ControllerClient] = {}
+        self.server = None
+        self.running = False
         
-    async def connect(self) -> bool:
-        """连接到本地控制端"""
+    async def start(self):
+        """启动服务端"""
+        self.running = True
+        logger.info(f"Windows 控制服务端启动: {self.host}:{self.port}")
+        
+        self.server = await websockets.serve(
+            self.handle_client,
+            self.host,
+            self.port,
+            ping_interval=20,
+            ping_timeout=10
+        )
+        
+        logger.info("等待本地控制端连接...")
+        
+    async def stop(self):
+        """停止服务端"""
+        self.running = False
+        
+        # 关闭所有客户端连接
+        for client in list(self.clients.values()):
+            try:
+                await client.websocket.close()
+            except:
+                pass
+        self.clients.clear()
+        
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
+        logger.info("服务端已停止")
+        
+    async def handle_client(self, websocket: websockets.WebSocketServerProtocol, path: str):
+        """处理客户端连接"""
+        client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        client = ControllerClient(websocket=websocket, client_id=client_id)
+        
+        self.clients[client_id] = client
+        logger.info(f"本地控制端已连接: {client_id}")
+        
         try:
-            uri = f"ws://{self.host}:{self.port}"
-            self.websocket = await websockets.connect(uri, ping_interval=20, ping_timeout=10)
-            self.connected = True
-            logger.info(f"已连接到本地控制端: {uri}")
-            return True
-        except Exception as e:
-            logger.error(f"连接本地控制端失败: {str(e)}")
-            self.connected = False
-            return False
-            
-    async def disconnect(self):
-        """断开连接"""
-        if self.websocket:
-            await self.websocket.close()
-            self.connected = False
-            logger.info("已断开与本地控制端的连接")
-            
-    async def send_command(self, action: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+            async for message in websocket:
+                try:
+                    data = json.loads(message)
+                    msg_type = data.get("type", "unknown")
+                    
+                    if msg_type == "pong":
+                        client.last_ping = datetime.now()
+                    elif msg_type == "result":
+                        # 命令执行结果，由 send_command 方法处理
+                        pass
+                    else:
+                        logger.warning(f"未知消息类型: {msg_type}")
+                        
+                except json.JSONDecodeError:
+                    logger.error(f"收到无效的 JSON: {message}")
+                except Exception as e:
+                    logger.error(f"处理消息时出错: {str(e)}")
+                    
+        except websockets.exceptions.ConnectionClosed:
+            logger.info(f"本地控制端断开连接: {client_id}")
+        finally:
+            if client_id in self.clients:
+                del self.clients[client_id]
+                
+    async def send_command(self, client_id: Optional[str], action: str, params: Dict[str, Any] = None, timeout: int = 30) -> Dict[str, Any]:
         """
-        发送命令到本地控制端
+        向指定客户端发送命令
         
         Args:
+            client_id: 客户端ID，None 表示使用第一个可用客户端
             action: 命令动作
             params: 命令参数
+            timeout: 超时时间（秒）
             
         Returns:
             执行结果
         """
-        if not self.connected or not self.websocket:
-            # 尝试重新连接
-            if not await self.connect():
-                return {"status": "error", "error": "未连接到本地控制端"}
+        # 获取客户端
+        if client_id is None:
+            if not self.clients:
+                return {"status": "error", "error": "没有可用的本地控制端连接"}
+            client = list(self.clients.values())[0]
+        else:
+            client = self.clients.get(client_id)
+            if not client:
+                return {"status": "error", "error": f"未找到客户端: {client_id}"}
+                
+        if client.is_busy:
+            return {"status": "error", "error": "客户端正忙"}
+            
+        client.is_busy = True
         
         try:
             command = {
+                "type": "command",
                 "action": action,
                 "params": params or {},
                 "timestamp": datetime.now().isoformat()
             }
             
-            await self.websocket.send(json.dumps(command))
+            await client.websocket.send(json.dumps(command))
             
             # 等待响应
             response = await asyncio.wait_for(
-                self.websocket.recv(),
-                timeout=self.timeout
+                client.websocket.recv(),
+                timeout=timeout
             )
             
-            return json.loads(response)
+            result = json.loads(response)
+            return result
             
         except asyncio.TimeoutError:
             logger.error("命令执行超时")
             return {"status": "error", "error": "命令执行超时"}
         except websockets.exceptions.ConnectionClosed:
             logger.error("连接已关闭")
-            self.connected = False
+            if client_id in self.clients:
+                del self.clients[client_id]
             return {"status": "error", "error": "连接已关闭"}
         except Exception as e:
             logger.error(f"发送命令失败: {str(e)}")
             return {"status": "error", "error": str(e)}
+        finally:
+            client.is_busy = False
             
-    async def ensure_connection(self) -> bool:
-        """确保连接状态"""
-        if not self.connected:
-            return await self.connect()
-        return True
+    def get_connected_clients(self) -> list:
+        """获取已连接的客户端列表"""
+        return [
+            {
+                "client_id": c.client_id,
+                "connected_at": c.connected_at.isoformat(),
+                "last_ping": c.last_ping.isoformat()
+            }
+            for c in self.clients.values()
+        ]
+        
+    def has_connected_client(self) -> bool:
+        """检查是否有已连接的客户端"""
+        return len(self.clients) > 0
 
 
-@register("windows_control", "枝动力", "Windows 远程控制插件，支持鼠标键盘操作和屏幕截图", "2.0.0")
+@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "2.0.0")
 class WindowsControlPlugin(Star):
-    """Windows 远程控制插件主类"""
+    """Windows 远程控制插件主类 - 服务端模式"""
     
     def __init__(self, context: Context):
         super().__init__(context)
         self.context = context
-        self.ws_client: Optional[WebSocketClient] = None
-        self.controller_host = "localhost"
-        self.controller_port = 8765
-        self.default_timeout = 30
+        self.controller_server: Optional[ControllerServer] = None
+        self.server_host = "0.0.0.0"
+        self.server_port = 8765
         
     async def initialize(self):
         """插件初始化"""
@@ -118,186 +198,34 @@ class WindowsControlPlugin(Star):
         config = self.context.get_config()
         plugin_config = config.get("windows_control", {})
         
-        self.controller_host = plugin_config.get("host", "localhost")
-        self.controller_port = plugin_config.get("port", 8765)
-        self.default_timeout = plugin_config.get("timeout", 30)
+        self.server_host = plugin_config.get("host", "0.0.0.0")
+        self.server_port = plugin_config.get("port", 8765)
         
-        # 初始化 WebSocket 客户端
-        self.ws_client = WebSocketClient(
-            host=self.controller_host,
-            port=self.controller_port,
-            timeout=self.default_timeout
+        # 初始化服务端
+        self.controller_server = ControllerServer(
+            host=self.server_host,
+            port=self.server_port
         )
         
-        logger.info(f"Windows 控制插件初始化完成，目标: {self.controller_host}:{self.controller_port}")
+        # 启动服务端
+        await self.controller_server.start()
+        
+        logger.info(f"Windows 控制插件初始化完成，监听: {self.server_host}:{self.server_port}")
         
     async def terminate(self):
         """插件销毁"""
-        if self.ws_client:
-            await self.ws_client.disconnect()
+        if self.controller_server:
+            await self.controller_server.stop()
         logger.info("Windows 控制插件已卸载")
         
-    # ==================== 指令命令 ====================
-    
-    @filter.command("wconnect")
-    async def connect_controller(self, event: AstrMessageEvent):
-        """连接到本地控制端"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        result = await self.ws_client.connect()
-        if result:
-            yield event.plain_result(f"✅ 已连接到本地控制端 {self.controller_host}:{self.controller_port}")
-        else:
-            yield event.plain_result(f"❌ 连接失败，请确保本地控制端已启动")
-            
-    @filter.command("wdisconnect")
-    async def disconnect_controller(self, event: AstrMessageEvent):
-        """断开与本地控制端的连接"""
-        if self.ws_client:
-            await self.ws_client.disconnect()
-            yield event.plain_result("已断开连接")
-        else:
-            yield event.plain_result("未连接")
-            
-    @filter.command("wstatus")
-    async def get_status(self, event: AstrMessageEvent):
-        """获取连接状态"""
-        if self.ws_client and self.ws_client.connected:
-            yield event.plain_result(f"✅ 已连接到 {self.controller_host}:{self.controller_port}")
-        else:
-            yield event.plain_result(f"❌ 未连接，目标: {self.controller_host}:{self.controller_port}")
-            
-    @filter.command("wscreen")
-    async def get_screenshot(self, event: AstrMessageEvent):
-        """获取屏幕截图"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        yield event.plain_result("📸 正在截图...")
+    def _check_connection(self) -> tuple[bool, str]:
+        """检查连接状态"""
+        if not self.controller_server:
+            return False, "服务端未初始化"
+        if not self.controller_server.has_connected_client():
+            return False, "没有本地控制端连接"
+        return True, ""
         
-        result = await self.ws_client.send_command("screenshot")
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            if screenshot_data:
-                chain = [
-                    Comp.Plain("屏幕截图："),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result("截图失败：无图像数据")
-        else:
-            error = result.get("error", "未知错误")
-            yield event.plain_result(f"截图失败: {error}")
-            
-    @filter.command("wmove")
-    async def move_mouse_cmd(self, event: AstrMessageEvent, x: int, y: int):
-        """移动鼠标到指定位置"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        yield event.plain_result(f"🖱️ 正在移动鼠标到 ({x}, {y})...")
-        
-        result = await self.ws_client.send_command("mouse_move", {"x": x, "y": y, "duration": 0.5})
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            message = result.get("result", {}).get("message", "")
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result(message)
-        else:
-            error = result.get("error", "未知错误")
-            yield event.plain_result(f"操作失败: {error}")
-            
-    @filter.command("wclick")
-    async def click_mouse_cmd(self, event: AstrMessageEvent, button: str = "left"):
-        """鼠标点击"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        yield event.plain_result(f"🖱️ 正在执行 {button} 键点击...")
-        
-        result = await self.ws_client.send_command("mouse_click", {"button": button, "clicks": 1})
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            message = result.get("result", {}).get("message", "")
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result(message)
-        else:
-            error = result.get("error", "未知错误")
-            yield event.plain_result(f"操作失败: {error}")
-            
-    @filter.command("wtype")
-    async def type_text_cmd(self, event: AstrMessageEvent, text: str):
-        """输入文本"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        yield event.plain_result(f"⌨️ 正在输入: {text}")
-        
-        result = await self.ws_client.send_command("type_string", {"text": text, "interval": 0.01})
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            message = result.get("result", {}).get("message", "")
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result(message)
-        else:
-            error = result.get("error", "未知错误")
-            yield event.plain_result(f"操作失败: {error}")
-            
-    @filter.command("wkey")
-    async def press_key_cmd(self, event: AstrMessageEvent, key: str):
-        """按下按键"""
-        if not self.ws_client:
-            yield event.plain_result("插件未初始化")
-            return
-            
-        yield event.plain_result(f"⌨️ 正在按下: {key}")
-        
-        result = await self.ws_client.send_command("key_press", {"key": key})
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            message = result.get("result", {}).get("message", "")
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result(message)
-        else:
-            error = result.get("error", "未知错误")
-            yield event.plain_result(f"操作失败: {error}")
-
     # ==================== LLM 工具函数 ====================
     
     @filter.llm_tool(name="mouse_move")
@@ -309,10 +237,13 @@ class WindowsControlPlugin(Star):
             x(int): 目标位置的 X 坐标（像素）
             y(int): 目标位置的 Y 坐标（像素）
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("mouse_move", {"x": x, "y": y, "duration": 0.5})
+        result = await self.controller_server.send_command(
+            None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
+        )
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -338,10 +269,13 @@ class WindowsControlPlugin(Star):
         Args:
             button(string): 鼠标按钮类型，可选值为 "left"（左键）、"right"（右键）、"middle"（中键），默认为 "left"
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("mouse_click", {"button": button, "clicks": 1})
+        result = await self.controller_server.send_command(
+            None, "mouse_click", {"button": button, "clicks": 1}
+        )
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -364,10 +298,13 @@ class WindowsControlPlugin(Star):
         '''
         执行鼠标右键点击操作
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("mouse_click", {"button": "right", "clicks": 1})
+        result = await self.controller_server.send_command(
+            None, "mouse_click", {"button": "right", "clicks": 1}
+        )
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -393,10 +330,13 @@ class WindowsControlPlugin(Star):
         Args:
             text(string): 要输入的文本字符串
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("type_string", {"text": text, "interval": 0.01})
+        result = await self.controller_server.send_command(
+            None, "type_string", {"text": text, "interval": 0.01}
+        )
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -422,10 +362,13 @@ class WindowsControlPlugin(Star):
         Args:
             key(string): 按键名称。单键如 "a", "enter", "esc"；组合键用 + 连接，如 "ctrl+c", "alt+tab", "win+d"
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("key_press", {"key": key})
+        result = await self.controller_server.send_command(
+            None, "key_press", {"key": key}
+        )
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -448,10 +391,11 @@ class WindowsControlPlugin(Star):
         '''
         获取当前屏幕截图，用于查看操作后的屏幕状态
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
-        result = await self.ws_client.send_command("screenshot")
+        result = await self.controller_server.send_command(None, "screenshot")
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -474,13 +418,14 @@ class WindowsControlPlugin(Star):
         '''
         获取屏幕尺寸和鼠标位置信息
         '''
-        if not self.ws_client:
-            return event.plain_result("错误：未连接到本地控制端")
+        connected, error_msg = self._check_connection()
+        if not connected:
+            return event.plain_result(f"错误：{error_msg}")
             
         # 获取屏幕尺寸
-        result_size = await self.ws_client.send_command("get_screen_size")
+        result_size = await self.controller_server.send_command(None, "get_screen_size")
         # 获取鼠标位置
-        result_pos = await self.ws_client.send_command("get_mouse_position")
+        result_pos = await self.controller_server.send_command(None, "get_mouse_position")
         
         if result_size.get("status") == "success" and result_pos.get("status") == "success":
             screen_size = result_size.get("result", {}).get("screen_size", {})

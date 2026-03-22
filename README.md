@@ -2,22 +2,49 @@
 
 一个功能强大的 AstrBot 插件，支持通过 LLM 函数调用远程控制 Windows 电脑，实现鼠标键盘操作和屏幕截图功能。
 
+## 系统架构
+
+本系统采用**服务端-客户端**架构：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AstrBot 服务器（公网）                    │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  AstrBot 插件端 (main.py) - 服务端模式                 │  │
+│  │  • WebSocket 服务端（等待客户端连接）                   │  │
+│  │  • LLM 工具注册（7个工具函数）                          │  │
+│  │  • 命令转发与结果接收                                   │  │
+│  └───────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ WebSocket 连接（客户端主动连接）
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Windows 本地电脑                          │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  本地控制端 (controller_client.py) - 客户端模式         │  │
+│  │  • WebSocket 客户端（主动连接服务器）                   │  │
+│  │  • 命令接收与执行                                       │  │
+│  │  • 自动重连机制                                         │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           │                                 │
+│  ┌───────────────────────┐│┌───────────────────────────────┐│
+│  │  InputController      │││  ScreenCapture                ││
+│  │  • 鼠标移动/点击      │││  • 全屏截图                   ││
+│  │  • 键盘输入           │││  • Base64编码                 ││
+│  │  • 组合键支持         │││                               ││
+│  └───────────────────────┘│└───────────────────────────────┘│
+└───────────────────────────┴─────────────────────────────────┘
+```
+
+**连接方式**：本地控制端（Windows电脑）主动连接到 AstrBot 服务器（公网）
+
 ## 功能特性
 
 - **鼠标控制**：移动、左键点击、右键点击
-- **键盘输入**：单键输入、连续字符串输入、组合键支持
-- **屏幕截图**：实时获取操作后的屏幕状态
+- **键盘输入**：单键输入、连续字符串输入、组合键支持（如 ctrl+c, alt+tab）
+- **屏幕截图**：每个操作后自动返回截图，让 LLM 了解操作结果
 - **LLM 集成**：通过 AstrBot 的 LLM 工具调用接口，实现 AI 自动化控制
-- **实时反馈**：每个操作后自动返回截图，让 LLM 了解操作结果
-
-## 系统架构
-
-本系统由两部分组成：
-
-1. **AstrBot 插件端** (`main.py`)：运行在 AstrBot 服务器上，提供 LLM 工具调用接口
-2. **本地控制端** (`local_controller/`)：运行在 Windows 电脑上，执行实际的鼠标键盘操作
-
-通信方式：WebSocket 双向实时通信
+- **自动重连**：本地控制端断开后自动重连
 
 ## 安装步骤
 
@@ -30,69 +57,66 @@ cd AstrBot/data/plugins
 git clone https://github.com/Zhidongli-A/astrbot_plugin_windows_Control.git
 ```
 
-### 2. 安装插件依赖
-
+安装依赖：
 ```bash
 cd astrbot_plugin_windows_Control
 pip install -r requirements.txt
 ```
 
+### 2. 配置 AstrBot 插件
+
+在 AstrBot WebUI 中配置插件：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| host | 服务端监听地址 | 0.0.0.0 |
+| port | 服务端监听端口 | 8765 |
+
+**注意**：如果 AstrBot 部署在云服务器上，需要在安全组/防火墙中开放配置的端口。
+
 ### 3. 部署本地控制端（在 Windows 电脑上）
 
-#### 方式一：直接运行 Python 脚本
-
 1. 将 `local_controller/` 目录复制到 Windows 电脑
+
 2. 安装依赖：
 ```bash
 cd local_controller
 pip install -r requirements.txt
 ```
-3. 启动控制端：
+
+3. 启动控制端（连接到 AstrBot 服务器）：
 ```bash
-python controller.py --host 0.0.0.0 --port 8765
+python controller_client.py --server <AstrBot服务器公网IP> --port 8765
 ```
 
-#### 方式二：打包为可执行文件（可选）
+例如：
+```bash
+python controller_client.py --server 123.45.67.89 --port 8765
+```
 
-使用 PyInstaller 打包：
+**启动参数说明**：
+- `--server` 或 `-s`: AstrBot 服务器的公网 IP 地址（必填）
+- `--port` 或 `-p`: 服务器端口（默认：8765）
+
+### 4. 使用 PyInstaller 打包（可选）
+
+可以将本地控制端打包为可执行文件，方便在没有 Python 环境的电脑上运行：
+
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --name WindowsController controller.py
+pyinstaller --onefile --name WindowsController controller_client.py
 ```
 
-### 4. 配置网络（重要）
+打包后，使用方式：
+```bash
+WindowsController.exe --server 123.45.67.89 --port 8765
+```
 
-如果 AstrBot 和 Windows 电脑不在同一网络：
-
-1. **Windows 电脑需要公网 IP 或使用内网穿透工具**（如 frp、ngrok）
-2. **配置防火墙**：开放控制端端口（默认 8765）
-3. **在 AstrBot WebUI 中配置插件**：
-   - 进入插件配置页面
-   - 设置 `host` 为 Windows 电脑的公网 IP 或内网穿透地址
-   - 设置 `port` 为控制端监听的端口
-
-## 使用方法
-
-### 手动指令
-
-插件提供以下手动指令：
-
-| 指令 | 说明 | 示例 |
-|------|------|------|
-| `/wconnect` | 连接到本地控制端 | `/wconnect` |
-| `/wdisconnect` | 断开连接 | `/wdisconnect` |
-| `/wstatus` | 查看连接状态 | `/wstatus` |
-| `/wscreen` | 获取屏幕截图 | `/wscreen` |
-| `/wmove` | 移动鼠标 | `/wmove 500 300` |
-| `/wclick` | 鼠标点击 | `/wclick left` 或 `/wclick right` |
-| `/wtype` | 输入文本 | `/wtype Hello World` |
-| `/wkey` | 按下按键 | `/wkey enter` 或 `/wkey ctrl+c` |
-
-### LLM 工具调用
+## LLM 工具调用
 
 当 LLM 需要控制 Windows 电脑时，会自动调用以下工具：
 
-#### 1. mouse_move - 移动鼠标
+### 1. mouse_move - 移动鼠标
 ```json
 {
   "x": 500,
@@ -100,7 +124,7 @@ pyinstaller --onefile --name WindowsController controller.py
 }
 ```
 
-#### 2. mouse_click - 鼠标点击
+### 2. mouse_click - 鼠标点击
 ```json
 {
   "button": "left"
@@ -108,17 +132,17 @@ pyinstaller --onefile --name WindowsController controller.py
 ```
 可选值：`left`（左键）、`right`（右键）、`middle`（中键）
 
-#### 3. mouse_right_click - 右键点击
+### 3. mouse_right_click - 右键点击
 无需参数
 
-#### 4. type_string - 输入字符串
+### 4. type_string - 输入字符串
 ```json
 {
   "text": "Hello World"
 }
 ```
 
-#### 5. press_key - 按下按键
+### 5. press_key - 按下按键
 ```json
 {
   "key": "enter"
@@ -126,10 +150,10 @@ pyinstaller --onefile --name WindowsController controller.py
 ```
 支持单键（如 `a`, `enter`, `esc`）和组合键（如 `ctrl+c`, `alt+tab`, `win+d`）
 
-#### 6. get_screenshot - 获取截图
+### 6. get_screenshot - 获取截图
 无需参数，返回当前屏幕截图
 
-#### 7. get_screen_info - 获取屏幕信息
+### 7. get_screen_info - 获取屏幕信息
 无需参数，返回屏幕尺寸和鼠标位置
 
 ## 工作流程示例
@@ -143,22 +167,45 @@ pyinstaller --onefile --name WindowsController controller.py
    - `type_string` (要输入的文字) 输入内容
 3. 每个操作后，LLM 都能看到截图反馈，确保操作正确执行
 
-## 配置说明
+## 网络配置
 
-在 AstrBot WebUI 的插件配置页面，可以设置：
+### 场景 1：AstrBot 部署在公网服务器
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| host | 本地控制端地址 | localhost |
-| port | 本地控制端端口 | 8765 |
-| timeout | 命令超时时间（秒） | 30 |
+```
+Windows电脑（任意网络）
+    │
+    │ WebSocket 连接
+    ▼
+公网服务器（AstrBot + 插件服务端）
+```
+
+配置步骤：
+1. 在服务器安全组中开放插件端口（默认 8765）
+2. 本地控制端使用服务器公网 IP 连接
+
+### 场景 2：AstrBot 部署在本地（内网穿透）
+
+```
+Windows电脑（任意网络）
+    │
+    │ WebSocket 连接
+    ▼
+内网穿透服务（如 frp/ngrok）
+    │
+    ▼
+本地电脑（AstrBot + 插件服务端）
+```
+
+配置步骤：
+1. 配置内网穿透，将本地插件端口映射到公网
+2. 本地控制端使用穿透后的公网地址连接
 
 ## 安全注意事项
 
 1. **网络安全**：
-   - 建议使用内网穿透工具配合身份验证
-   - 不要直接将控制端暴露在公网
-   - 考虑使用 VPN 或 SSH 隧道
+   - 建议在内网穿透或 VPN 环境下使用
+   - 不要直接将 AstrBot 服务器暴露在公网而不加防护
+   - 考虑使用防火墙限制访问来源 IP
 
 2. **操作安全**：
    - 本地控制端启用了 PyAutoGUI 的故障保护（将鼠标移到屏幕角落会停止）
@@ -171,13 +218,13 @@ pyinstaller --onefile --name WindowsController controller.py
 
 ## 故障排除
 
-### 连接失败
-- 检查控制端是否已启动
-- 检查防火墙设置
-- 验证 host 和 port 配置是否正确
-- 查看 AstrBot 日志和控制端日志
+### 本地控制端无法连接
+- 检查 AstrBot 服务器端口是否已开放
+- 检查服务器防火墙/安全组设置
+- 验证服务器地址和端口是否正确
+- 查看 AstrBot 日志确认服务端是否启动
 
-### 操作无响应
+### 命令执行无响应
 - 检查 Windows 电脑是否处于锁定状态
 - 确认 pyautogui 有权限控制鼠标键盘
 - 尝试以管理员权限运行控制端
@@ -201,11 +248,12 @@ pyinstaller --onefile --name WindowsController controller.py
 ## 更新日志
 
 ### v2.0.0
-- 全新架构，支持 LLM 工具调用
-- 新增 WebSocket 实时通信
-- 新增屏幕截图自动反馈
-- 支持组合键操作
-- 新增手动指令
+- 全新架构，改为客户端-服务端模式
+- 本地控制端主动连接 AstrBot 服务器
+- 新增自动重连机制
+- 支持 LLM 工具调用
+- 新增 7 个 LLM 工具函数
+- 每个操作后自动返回截图
 
 ### v1.0.0
 - 初始版本

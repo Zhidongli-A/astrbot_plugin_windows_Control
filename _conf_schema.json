@@ -1,20 +1,14 @@
 {
   "host": {
-    "description": "本地控制端地址",
+    "description": "服务端监听地址",
     "type": "string",
-    "hint": "本地控制端程序的 IP 地址，如果 AstrBot 和控制端在同一台机器上，使用 localhost",
-    "default": "localhost"
+    "hint": "服务端监听的地址，0.0.0.0 表示监听所有网络接口",
+    "default": "0.0.0.0"
   },
   "port": {
-    "description": "本地控制端端口",
+    "description": "服务端监听端口",
     "type": "int",
-    "hint": "本地控制端程序监听的端口号",
+    "hint": "服务端监听的端口号，本地控制端将连接到此端口",
     "default": 8765
-  },
-  "timeout": {
-    "description": "命令超时时间（秒）",
-    "type": "int",
-    "hint": "等待本地控制端响应的最大时间",
-    "default": 30
   }
 }
