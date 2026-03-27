@@ -209,8 +209,11 @@ class WindowsControlPlugin(Star):
         config = self.context.get_config()
         plugin_config = config.get("windows_control", {})
         
-        self.server_host = plugin_config.get("host", "").strip()
+        raw_host = plugin_config.get("host")
+        self.server_host = raw_host.strip() if raw_host else ""
         self.server_port = plugin_config.get("port")
+        
+        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}, raw_host={raw_host}")
         
         # 检查必要配置
         if not self.server_host:
