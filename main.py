@@ -209,14 +209,14 @@ class WindowsControlPlugin(Star):
         config = self.context.get_config()
         plugin_config = config.get("windows_control", {})
         
-        self.server_host = plugin_config.get("host")
+        self.server_host = plugin_config.get("host", "").strip()
         self.server_port = plugin_config.get("port")
         
         # 检查必要配置
         if not self.server_host:
             logger.error("未配置 host，请在面板中设置服务器地址")
             return
-        if not self.server_port:
+        if not self.server_port or self.server_port == 0:
             logger.error("未配置 port，请在面板中设置服务器端口")
             return
         
