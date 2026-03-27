@@ -1,7 +1,7 @@
 name: astrbot_plugin_windows_Control
 display_name: Windows远程控制插件
 desc: 一个功能强大的 Windows 远程控制插件，支持 LLM 调用鼠标键盘操作和屏幕截图，实现 AI 自动化控制 Windows 电脑
-version: 1.00
+version: V1.01
 author: 枝动力
 repo: https://github.com/Zhidongli-A/astrbot_plugin_windows_Control
 support_platforms:

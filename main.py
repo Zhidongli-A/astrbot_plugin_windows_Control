@@ -81,7 +81,7 @@ class ControllerServer:
             await self.server.wait_closed()
         logger.info("服务端已停止")
         
-    async def handle_client(self, websocket: websockets.WebSocketServerProtocol, path: str):
+    async def handle_client(self, websocket: websockets.WebSocketServerProtocol):
         """处理客户端连接"""
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
         client = ControllerClient(websocket=websocket, client_id=client_id)
@@ -191,7 +191,7 @@ class ControllerServer:
         return len(self.clients) > 0
 
 
-@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "1.00")
+@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "V1.01")
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
     

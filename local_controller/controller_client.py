@@ -23,23 +23,14 @@ from screen_capture import ScreenCapture
 class LocalControllerClient:
     """本地控制端客户端 - 主动连接服务器"""
     
-    def __init__(self, server_host: str, server_port: int = None, use_ssl: bool = False):
+    def __init__(self, server_host: str, server_port: int, use_ssl: bool = False):
         self.server_host = server_host
         self.server_port = server_port
         self.use_ssl = use_ssl
         
-        # 支持完整 URL 或自动生成
-        if server_host.startswith(('ws://', 'wss://')):
-            self.server_uri = server_host
-            # 从 URL 解析是否使用 SSL
-            self.use_ssl = server_host.startswith('wss://')
-        else:
-            protocol = 'wss' if use_ssl else 'ws'
-            # 使用域名代理时不需要端口（使用默认80/443），IP连接时需要端口
-            if server_port:
-                self.server_uri = f"{protocol}://{server_host}:{server_port}"
-            else:
-                self.server_uri = f"{protocol}://{server_host}"
+        # 只支持 IP + 端口连接
+        protocol = 'wss' if use_ssl else 'ws'
+        self.server_uri = f"{protocol}://{server_host}:{server_port}"
         
         self.websocket = None
         self.connected = False
