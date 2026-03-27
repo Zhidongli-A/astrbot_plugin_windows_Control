@@ -28,6 +28,7 @@ class ControllerClient:
     connected_at: datetime = field(default_factory=datetime.now)
     last_ping: datetime = field(default_factory=datetime.now)
     is_busy: bool = False
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class ControllerServer:
@@ -138,43 +139,38 @@ class ControllerServer:
             if not client:
                 return {"status": "error", "error": f"未找到客户端: {client_id}"}
                 
-        if client.is_busy:
-            return {"status": "error", "error": "客户端正忙"}
-            
-        client.is_busy = True
-        
-        try:
-            command = {
-                "type": "command",
-                "action": action,
-                "params": params or {},
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            await client.websocket.send(json.dumps(command))
-            
-            # 等待响应
-            response = await asyncio.wait_for(
-                client.websocket.recv(),
-                timeout=timeout
-            )
-            
-            result = json.loads(response)
-            return result
-            
-        except asyncio.TimeoutError:
-            logger.error("命令执行超时")
-            return {"status": "error", "error": "命令执行超时"}
-        except websockets.exceptions.ConnectionClosed:
-            logger.error("连接已关闭")
-            if client_id in self.clients:
-                del self.clients[client_id]
-            return {"status": "error", "error": "连接已关闭"}
-        except Exception as e:
-            logger.error(f"发送命令失败: {str(e)}")
-            return {"status": "error", "error": str(e)}
-        finally:
-            client.is_busy = False
+        # 使用锁保护 recv 操作，防止并发冲突
+        async with client.lock:
+            try:
+                command = {
+                    "type": "command",
+                    "action": action,
+                    "params": params or {},
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                await client.websocket.send(json.dumps(command))
+                
+                # 等待响应
+                response = await asyncio.wait_for(
+                    client.websocket.recv(),
+                    timeout=timeout
+                )
+                
+                result = json.loads(response)
+                return result
+                
+            except asyncio.TimeoutError:
+                logger.error("命令执行超时")
+                return {"status": "error", "error": "命令执行超时"}
+            except websockets.exceptions.ConnectionClosed:
+                logger.error("连接已关闭")
+                if client_id in self.clients:
+                    del self.clients[client_id]
+                return {"status": "error", "error": "连接已关闭"}
+            except Exception as e:
+                logger.error(f"发送命令失败: {str(e)}")
+                return {"status": "error", "error": str(e)}
             
     def get_connected_clients(self) -> list:
         """获取已连接的客户端列表"""
