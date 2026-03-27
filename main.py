@@ -9,6 +9,7 @@ import asyncio
 import websockets
 import json
 import base64
+import functools
 from datetime import datetime
 from typing import Optional, Dict, Any, Set
 from dataclasses import dataclass, field
@@ -47,7 +48,7 @@ class ControllerServer:
             logger.info(f"Windows 控制服务端启动: {self.host}:{self.port}")
             
             self.server = await websockets.serve(
-                self.handle_client,
+                functools.partial(self.handle_client),
                 self.host,
                 self.port,
                 ping_interval=20,

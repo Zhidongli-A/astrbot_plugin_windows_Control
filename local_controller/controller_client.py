@@ -305,7 +305,7 @@ async def main():
     
     parser = argparse.ArgumentParser(description="Windows 本地控制端 - 客户端模式")
     parser.add_argument("--server", "-s", required=True, help="AstrBot 服务器地址（IP、域名或ws://完整URL）")
-    parser.add_argument("--port", "-p", type=int, default=None, help="服务器端口（使用域名代理时可省略，IP连接时必填）")
+    parser.add_argument("--port", "-p", type=int, required=True, help="服务器端口")
     parser.add_argument("--ssl", action="store_true", help="使用 wss:// 加密连接（域名代理时自动使用443端口）")
     args = parser.parse_args()
     
