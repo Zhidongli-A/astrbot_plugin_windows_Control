@@ -206,14 +206,21 @@ class WindowsControlPlugin(Star):
     async def initialize(self):
         """插件初始化"""
         # 从配置中读取设置
-        config = self.context.get_config()
-        plugin_config = config.get("windows_control", {})
+        try:
+            from astrbot.core.config.astrbot_config import AstrBotConfig
+            config = self.context.get_config()
+            if isinstance(config, AstrBotConfig):
+                plugin_config = config.get("windows_control", {})
+            else:
+                plugin_config = config
+        except:
+            plugin_config = self.context.get_config()
         
-        raw_host = plugin_config.get("host")
+        raw_host = plugin_config.get("host") if hasattr(plugin_config, 'get') else None
         self.server_host = raw_host.strip() if raw_host else ""
-        self.server_port = plugin_config.get("port")
+        self.server_port = plugin_config.get("port") if hasattr(plugin_config, 'get') else None
         
-        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}, raw_host={raw_host}")
+        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}, raw_host={raw_host}, config_type={type(plugin_config)}")
         
         # 检查必要配置
         if not self.server_host:
