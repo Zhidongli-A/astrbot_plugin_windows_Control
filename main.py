@@ -227,9 +227,24 @@ class WindowsControlPlugin(Star):
             try:
                 cfg = self.context.get_config()
                 logger.info(f"方式3 - get_config 类型: {type(cfg)}")
-                if isinstance(cfg, dict):
-                    self.server_host = cfg.get('host')
-                    self.server_port = cfg.get('port')
+                # AstrBotConfig 对象，使用 get() 方法读取
+                if hasattr(cfg, 'get'):
+                    # 尝试从 windows_control 命名空间读取
+                    plugin_cfg = cfg.get('windows_control', {})
+                    if plugin_cfg:
+                        self.server_host = plugin_cfg.get('host') if isinstance(plugin_cfg, dict) else getattr(plugin_cfg, 'host', None)
+                        self.server_port = plugin_cfg.get('port') if isinstance(plugin_cfg, dict) else getattr(plugin_cfg, 'port', None)
+                        logger.info(f"方式3 - 从 windows_control 读取: host={self.server_host}, port={self.server_port}")
+                    # 如果失败，尝试直接从根读取
+                    if not self.server_host:
+                        self.server_host = cfg.get('host')
+                        self.server_port = cfg.get('port')
+                        logger.info(f"方式3 - 从根读取: host={self.server_host}, port={self.server_port}")
+                elif isinstance(cfg, dict):
+                    plugin_cfg = cfg.get('windows_control', {})
+                    if plugin_cfg:
+                        self.server_host = plugin_cfg.get('host')
+                        self.server_port = plugin_cfg.get('port')
                     logger.info(f"方式3 - 从 dict 读取: host={self.server_host}, port={self.server_port}")
             except Exception as e:
                 logger.error(f"方式3 - get_config 失败: {e}")
