@@ -191,7 +191,7 @@ class ControllerServer:
         return len(self.clients) > 0
 
 
-@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "V1.01")
+@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "v1.0.1")
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
     
