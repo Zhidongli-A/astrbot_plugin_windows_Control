@@ -196,9 +196,10 @@ class ControllerServer:
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
     
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: dict = None):
         super().__init__(context)
         self.context = context
+        self.config = config  # 插件配置
         self.controller_server: Optional[ControllerServer] = None
         self.server_host = None
         self.server_port = None
@@ -206,48 +207,14 @@ class WindowsControlPlugin(Star):
     async def initialize(self):
         """插件初始化"""
         # 从配置中读取设置
-        # 根据 AstrBot 文档，配置项直接作为属性在 context 上
+        # AstrBot 会将 _conf_schema.json 中的配置作为 dict 传入 __init__ 的 config 参数
         
-        # 方式1: 直接从 context 读取配置项
-        self.server_host = getattr(self.context, 'host', None)
-        self.server_port = getattr(self.context, 'port', None)
-        logger.info(f"方式1 - 直接从 context: host={self.server_host}, port={self.server_port}")
-        
-        # 方式2: 尝试从 config 属性读取（可能是嵌套字典）
-        if not self.server_host and hasattr(self.context, 'config'):
-            cfg = self.context.config
-            logger.info(f"方式2 - config 类型: {type(cfg)}")
-            if isinstance(cfg, dict):
-                self.server_host = cfg.get('host')
-                self.server_port = cfg.get('port')
-                logger.info(f"方式2 - 从 dict 读取: host={self.server_host}, port={self.server_port}")
-        
-        # 方式3: 尝试 get_config 方法
-        if not self.server_host and hasattr(self.context, 'get_config'):
-            try:
-                cfg = self.context.get_config()
-                logger.info(f"方式3 - get_config 类型: {type(cfg)}")
-                # AstrBotConfig 对象，使用 get() 方法读取
-                if hasattr(cfg, 'get'):
-                    # 尝试从 windows_control 命名空间读取
-                    plugin_cfg = cfg.get('windows_control', {})
-                    if plugin_cfg:
-                        self.server_host = plugin_cfg.get('host') if isinstance(plugin_cfg, dict) else getattr(plugin_cfg, 'host', None)
-                        self.server_port = plugin_cfg.get('port') if isinstance(plugin_cfg, dict) else getattr(plugin_cfg, 'port', None)
-                        logger.info(f"方式3 - 从 windows_control 读取: host={self.server_host}, port={self.server_port}")
-                    # 如果失败，尝试直接从根读取
-                    if not self.server_host:
-                        self.server_host = cfg.get('host')
-                        self.server_port = cfg.get('port')
-                        logger.info(f"方式3 - 从根读取: host={self.server_host}, port={self.server_port}")
-                elif isinstance(cfg, dict):
-                    plugin_cfg = cfg.get('windows_control', {})
-                    if plugin_cfg:
-                        self.server_host = plugin_cfg.get('host')
-                        self.server_port = plugin_cfg.get('port')
-                    logger.info(f"方式3 - 从 dict 读取: host={self.server_host}, port={self.server_port}")
-            except Exception as e:
-                logger.error(f"方式3 - get_config 失败: {e}")
+        if self.config and isinstance(self.config, dict):
+            self.server_host = self.config.get('host')
+            self.server_port = self.config.get('port')
+            logger.info(f"从 self.config 读取: host={self.server_host}, port={self.server_port}")
+        else:
+            logger.warning(f"self.config 为空或不是 dict: {self.config}")
         
         # 处理值
         self.server_host = str(self.server_host).strip() if self.server_host else ""

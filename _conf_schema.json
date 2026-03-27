@@ -1,18 +1,12 @@
 {
-  "windows_control": {
-    "description": "Windows 远程控制插件配置",
-    "type": "object",
-    "items": {
-      "host": {
-        "description": "服务端监听地址",
-        "type": "string",
-        "hint": "服务端监听的地址，0.0.0.0 表示监听所有网络接口"
-      },
-      "port": {
-        "description": "服务端监听端口",
-        "type": "int",
-        "hint": "服务端监听的端口号，本地控制端将连接到此端口"
-      }
-    }
+  "host": {
+    "description": "服务端监听地址",
+    "type": "string",
+    "hint": "服务端监听的地址，0.0.0.0 表示监听所有网络接口"
+  },
+  "port": {
+    "description": "服务端监听端口",
+    "type": "int",
+    "hint": "服务端监听的端口号，本地控制端将连接到此端口"
   }
 }
