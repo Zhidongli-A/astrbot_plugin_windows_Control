@@ -205,22 +205,47 @@ class WindowsControlPlugin(Star):
         
     async def initialize(self):
         """插件初始化"""
-        # 从配置中读取设置
-        try:
-            from astrbot.core.config.astrbot_config import AstrBotConfig
-            config = self.context.get_config()
-            if isinstance(config, AstrBotConfig):
-                plugin_config = config.get("windows_control", {})
+        # 从配置中读取设置 - AstrBot 配置直接通过 self.context 访问
+        # 配置项在 _conf_schema.json 中定义，AstrBot 会自动加载
+        
+        # 尝试多种方式读取配置
+        plugin_config = {}
+        
+        # 方式1: 通过 context 的 config 属性
+        if hasattr(self.context, 'config') and self.context.config:
+            cfg = self.context.config
+            if isinstance(cfg, dict):
+                plugin_config = cfg.get("windows_control", {})
             else:
-                plugin_config = config
-        except:
-            plugin_config = self.context.get_config()
+                plugin_config = getattr(cfg, 'windows_control', {})
         
-        raw_host = plugin_config.get("host") if hasattr(plugin_config, 'get') else None
-        self.server_host = raw_host.strip() if raw_host else ""
-        self.server_port = plugin_config.get("port") if hasattr(plugin_config, 'get') else None
+        # 方式2: 通过 context 的 get_config 方法
+        if not plugin_config and hasattr(self.context, 'get_config'):
+            try:
+                cfg = self.context.get_config()
+                if isinstance(cfg, dict):
+                    plugin_config = cfg.get("windows_control", {})
+                elif hasattr(cfg, 'get'):
+                    plugin_config = cfg.get("windows_control", {})
+            except:
+                pass
         
-        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}, raw_host={raw_host}, config_type={type(plugin_config)}")
+        # 方式3: 直接从 context 读取（AstrBot v4+）
+        if not plugin_config:
+            for attr in ['windows_control', 'plugin_config', 'config']:
+                if hasattr(self.context, attr):
+                    val = getattr(self.context, attr)
+                    if val and isinstance(val, dict):
+                        plugin_config = val
+                        break
+        
+        raw_host = plugin_config.get("host") if isinstance(plugin_config, dict) else None
+        self.server_host = str(raw_host).strip() if raw_host else ""
+        
+        raw_port = plugin_config.get("port") if isinstance(plugin_config, dict) else None
+        self.server_port = int(raw_port) if raw_port else None
+        
+        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}, raw_host={raw_host}, plugin_config={plugin_config}")
         
         # 检查必要配置
         if not self.server_host:
