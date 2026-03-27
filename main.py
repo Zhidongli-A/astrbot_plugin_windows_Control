@@ -206,37 +206,39 @@ class WindowsControlPlugin(Star):
     async def initialize(self):
         """插件初始化"""
         # 从配置中读取设置
-        # AstrBot 会将 _conf_schema.json 中的配置项作为属性注入到 context
+        # 根据 AstrBot 文档，配置项直接作为属性在 context 上
         
         # 方式1: 直接从 context 读取配置项
         self.server_host = getattr(self.context, 'host', None)
         self.server_port = getattr(self.context, 'port', None)
+        logger.info(f"方式1 - 直接从 context: host={self.server_host}, port={self.server_port}")
         
-        # 方式2: 如果方式1失败，尝试从 config 属性读取
+        # 方式2: 尝试从 config 属性读取（可能是嵌套字典）
         if not self.server_host and hasattr(self.context, 'config'):
             cfg = self.context.config
+            logger.info(f"方式2 - config 类型: {type(cfg)}")
             if isinstance(cfg, dict):
                 self.server_host = cfg.get('host')
                 self.server_port = cfg.get('port')
-            elif hasattr(cfg, 'host'):
-                self.server_host = getattr(cfg, 'host')
-                self.server_port = getattr(cfg, 'port')
+                logger.info(f"方式2 - 从 dict 读取: host={self.server_host}, port={self.server_port}")
         
         # 方式3: 尝试 get_config 方法
         if not self.server_host and hasattr(self.context, 'get_config'):
             try:
                 cfg = self.context.get_config()
+                logger.info(f"方式3 - get_config 类型: {type(cfg)}")
                 if isinstance(cfg, dict):
                     self.server_host = cfg.get('host')
                     self.server_port = cfg.get('port')
-            except:
-                pass
+                    logger.info(f"方式3 - 从 dict 读取: host={self.server_host}, port={self.server_port}")
+            except Exception as e:
+                logger.error(f"方式3 - get_config 失败: {e}")
         
         # 处理值
         self.server_host = str(self.server_host).strip() if self.server_host else ""
         self.server_port = int(self.server_port) if self.server_port else None
         
-        logger.info(f"配置读取: host='{self.server_host}', port={self.server_port}")
+        logger.info(f"最终配置: host='{self.server_host}', port={self.server_port}")
         
         # 检查必要配置
         if not self.server_host:
