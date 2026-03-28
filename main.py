@@ -84,7 +84,7 @@ class ControllerServer:
         logger.info("服务端已停止")
         
     async def handle_client(self, websocket: websockets.WebSocketServerProtocol):
-        """处理客户端连接"""
+        """处理客户端连接 - 只保持连接状态，不主动接收消息"""
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
         client = ControllerClient(websocket=websocket, client_id=client_id)
         
@@ -92,24 +92,8 @@ class ControllerServer:
         logger.info(f"本地控制端已连接: {client_id}")
         
         try:
-            async for message in websocket:
-                try:
-                    data = json.loads(message)
-                    msg_type = data.get("type", "unknown")
-                    
-                    if msg_type == "pong":
-                        client.last_ping = datetime.now()
-                    elif msg_type == "result":
-                        # 命令执行结果，由 send_command 方法处理
-                        pass
-                    else:
-                        logger.warning(f"未知消息类型: {msg_type}")
-                        
-                except json.JSONDecodeError:
-                    logger.error(f"收到无效的 JSON: {message}")
-                except Exception as e:
-                    logger.error(f"处理消息时出错: {str(e)}")
-                    
+            # 保持连接，等待断开
+            await websocket.wait_closed()
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"本地控制端断开连接: {client_id}")
         finally:
