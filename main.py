@@ -197,7 +197,6 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         x = kwargs.get("x", 0)
         y = kwargs.get("y", 0)
-        # 获取插件实例
         plugin = context.ctx
         if not plugin or not plugin.controller_server:
             return ToolExecResult(error="插件未初始化")
@@ -364,7 +363,8 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                return ToolExecResult(result=f"{message}\n截图数据: {screenshot_data[:100]}...")
+                # 直接返回截图数据，由 Agent 处理展示
+                return ToolExecResult(result=f"{message}\n截图数据已获取")
             else:
                 return ToolExecResult(error="截图失败：无图像数据")
         else:
