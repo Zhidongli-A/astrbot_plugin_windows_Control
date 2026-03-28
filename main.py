@@ -24,6 +24,14 @@ from astrbot.core.agent.tool import FunctionTool, ToolExecResult
 from astrbot.core.astr_agent_context import AstrAgentContext
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
+# 导入视觉分析模块
+from .vision_analyzer import (
+    VisionAnalyzer, 
+    get_vision_analyzer, 
+    set_vision_analyzer,
+    analyze_screenshot_with_ai
+)
+
 
 # 全局变量，用于存储 controller_server 实例
 _controller_server_instance: Optional['ControllerServer'] = None
@@ -40,8 +48,8 @@ def set_controller_server(server: Optional['ControllerServer']):
     _controller_server_instance = server
 
 
-def save_screenshot(screenshot_data: str) -> str:
-    """保存截图到插件数据目录，返回文件路径"""
+async def save_and_analyze_screenshot(screenshot_data: str, enable_analysis: bool = True) -> str:
+    """保存截图到插件数据目录，并可选进行 AI 分析，返回完整结果"""
     try:
         from pathlib import Path
         
@@ -57,7 +65,17 @@ def save_screenshot(screenshot_data: str) -> str:
         with open(filepath, "wb") as f:
             f.write(base64.b64decode(screenshot_data))
         
-        return str(filepath)
+        result_text = f"截图已保存到: {filepath}"
+        
+        # 如果启用了视觉分析，调用 AI 分析截图
+        if enable_analysis:
+            try:
+                analysis = await analyze_screenshot_with_ai(str(filepath))
+                result_text += f"\n\n=== AI 视觉分析 ===\n{analysis}"
+            except Exception as e:
+                result_text += f"\n\n视觉分析失败: {str(e)}"
+        
+        return result_text
     except Exception as e:
         return f"保存截图失败: {str(e)}"
 
@@ -249,8 +267,8 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "鼠标移动完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -286,8 +304,8 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -319,8 +337,8 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "右键点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -356,8 +374,8 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "文本输入完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -393,8 +411,8 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "按键操作完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -424,8 +442,8 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                filepath = save_screenshot(screenshot_data)
-                return f"{message}\n截图: {filepath}"
+                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
+                return f"{message}\n{screenshot_result}"
             else:
                 return "错误：截图失败，无图像数据"
         else:
@@ -517,7 +535,29 @@ class WindowsControlPlugin(Star):
         if self.config and isinstance(self.config, dict):
             self.server_host = self.config.get('host')
             self.server_port = self.config.get('port')
+            
+            # 读取视觉分析配置
+            vision_provider = self.config.get('vision_api_provider', 'openai')
+            vision_api_key = self.config.get('vision_api_key', '')
+            vision_endpoint = self.config.get('vision_api_endpoint', 'https://api.openai.com/v1')
+            vision_model = self.config.get('vision_model', 'gpt-4o')
+            enable_vision = self.config.get('enable_vision_analysis', True)
+            
             logger.info(f"从 self.config 读取: host={self.server_host}, port={self.server_port}")
+            logger.info(f"视觉分析配置: provider={vision_provider}, model={vision_model}, enabled={enable_vision}")
+            
+            # 初始化视觉分析器
+            if enable_vision and vision_api_key:
+                vision_analyzer = VisionAnalyzer(
+                    api_provider=vision_provider,
+                    api_key=vision_api_key,
+                    api_endpoint=vision_endpoint,
+                    model=vision_model
+                )
+                set_vision_analyzer(vision_analyzer)
+                logger.info("视觉分析器已初始化")
+            elif enable_vision and not vision_api_key:
+                logger.warning("启用了视觉分析但未配置 API 密钥，请在面板中设置")
         else:
             logger.warning(f"self.config 为空或不是 dict: {self.config}")
         
@@ -558,6 +598,7 @@ class WindowsControlPlugin(Star):
             await self.controller_server.stop()
         # 清除全局变量
         set_controller_server(None)
+        set_vision_analyzer(None)
         logger.info("Windows 控制插件已卸载")
         
     def _check_connection(self) -> Tuple[bool, str]:
