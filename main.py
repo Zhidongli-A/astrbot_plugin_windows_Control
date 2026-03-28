@@ -11,7 +11,7 @@ import json
 import base64
 import functools
 from datetime import datetime
-from typing import Optional, Dict, Any, Set
+from typing import Optional, Dict, Any, Set, Tuple
 from dataclasses import dataclass, field
 
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
@@ -517,7 +517,7 @@ class WindowsControlPlugin(Star):
         set_controller_server(None)
         logger.info("Windows 控制插件已卸载")
         
-    def _check_connection(self) -> tuple[bool, str]:
+    def _check_connection(self) -> Tuple[bool, str]:
         """检查连接状态"""
         if not self.controller_server:
             return False, "服务端未初始化"
