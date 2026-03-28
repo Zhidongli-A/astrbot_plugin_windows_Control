@@ -52,9 +52,14 @@ async def save_and_analyze_screenshot(screenshot_data: str, enable_analysis: boo
     """保存截图到插件数据目录，并可选进行 AI 分析，返回完整结果"""
     try:
         from pathlib import Path
+        import os
         
         # 获取插件数据目录
-        plugin_data_path = get_astrbot_data_path() / "plugin_data" / "windows_control"
+        data_path = get_astrbot_data_path()
+        # 如果返回的是字符串，转换为 Path 对象
+        if isinstance(data_path, str):
+            data_path = Path(data_path)
+        plugin_data_path = data_path / "plugin_data" / "windows_control"
         plugin_data_path.mkdir(parents=True, exist_ok=True)
         
         # 生成文件名
