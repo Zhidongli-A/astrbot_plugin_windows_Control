@@ -207,16 +207,16 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
         "required": ["x", "y"]
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         x = kwargs.get("x", 0)
         y = kwargs.get("y", 0)
         
         # 通过全局变量获取 controller_server
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(
             None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
@@ -224,9 +224,9 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "鼠标移动完成")
-            return ToolExecResult(result=message)
+            return message
         else:
-            return ToolExecResult(error=result.get("error", "操作失败"))
+            return f"错误：{result.get('error', '操作失败')}"
 
 
 @dataclass
@@ -242,14 +242,14 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
         "required": []
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         button = kwargs.get("button", "left")
         
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(
             None, "mouse_click", {"button": button, "clicks": 1}
@@ -257,9 +257,9 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "点击完成")
-            return ToolExecResult(result=message)
+            return message
         else:
-            return ToolExecResult(error=result.get("error", "操作失败"))
+            return f"错误：{result.get('error', '操作失败')}"
 
 
 @dataclass
@@ -273,12 +273,12 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
         "required": []
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(
             None, "mouse_click", {"button": "right", "clicks": 1}
@@ -286,9 +286,9 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "右键点击完成")
-            return ToolExecResult(result=message)
+            return message
         else:
-            return ToolExecResult(error=result.get("error", "操作失败"))
+            return f"错误：{result.get('error', '操作失败')}"
 
 
 @dataclass
@@ -304,14 +304,14 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
         "required": ["text"]
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         text = kwargs.get("text", "")
         
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(
             None, "type_string", {"text": text, "interval": 0.01}
@@ -319,9 +319,9 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "文本输入完成")
-            return ToolExecResult(result=message)
+            return message
         else:
-            return ToolExecResult(error=result.get("error", "操作失败"))
+            return f"错误：{result.get('error', '操作失败')}"
 
 
 @dataclass
@@ -337,14 +337,14 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
         "required": ["key"]
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         key = kwargs.get("key", "")
         
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(
             None, "key_press", {"key": key}
@@ -352,9 +352,9 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "按键操作完成")
-            return ToolExecResult(result=message)
+            return message
         else:
-            return ToolExecResult(error=result.get("error", "操作失败"))
+            return f"错误：{result.get('error', '操作失败')}"
 
 
 @dataclass
@@ -368,12 +368,12 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
         "required": []
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         result = await controller_server.send_command(None, "screenshot")
         
@@ -382,11 +382,11 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
                 # 直接返回截图数据，由 Agent 处理展示
-                return ToolExecResult(result=f"{message}\n截图数据已获取")
+                return f"{message}\n截图数据已获取"
             else:
-                return ToolExecResult(error="截图失败：无图像数据")
+                return "错误：截图失败，无图像数据"
         else:
-            return ToolExecResult(error=result.get("error", "截图失败"))
+            return f"错误：{result.get('error', '截图失败')}"
 
 
 @dataclass
@@ -400,12 +400,12 @@ class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
         "required": []
     })
     
-    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs):
         controller_server = get_controller_server()
         if not controller_server:
-            return ToolExecResult(error="插件未初始化")
+            return "错误：插件未初始化"
         if not controller_server.has_connected_client():
-            return ToolExecResult(error="没有本地控制端连接")
+            return "错误：没有本地控制端连接"
         
         # 获取屏幕尺寸
         result_size = await controller_server.send_command(None, "get_screen_size")
@@ -420,10 +420,10 @@ class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
 屏幕尺寸: {screen_size.get('width', '未知')} x {screen_size.get('height', '未知')}
 鼠标位置: ({mouse_pos.get('x', '未知')}, {mouse_pos.get('y', '未知')})"""
             
-            return ToolExecResult(result=info)
+            return info
         else:
             error = result_size.get("error") or result_pos.get("error", "获取信息失败")
-            return ToolExecResult(error=error)
+            return f"错误：{error}"
 
 
 @register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "v1.0.1")
