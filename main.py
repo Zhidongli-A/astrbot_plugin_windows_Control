@@ -24,14 +24,6 @@ from astrbot.core.agent.tool import FunctionTool, ToolExecResult
 from astrbot.core.astr_agent_context import AstrAgentContext
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-# 导入视觉分析模块
-from .vision_analyzer import (
-    VisionAnalyzer, 
-    get_vision_analyzer, 
-    set_vision_analyzer,
-    analyze_screenshot_with_ai
-)
-
 
 # 全局变量，用于存储 controller_server 实例
 _controller_server_instance: Optional['ControllerServer'] = None
@@ -94,41 +86,7 @@ def create_tool_result_with_image(message: str, image_path: str) -> dict:
     }
 
 
-async def save_and_analyze_screenshot(screenshot_data: str, enable_analysis: bool = True) -> str:
-    """保存截图到插件数据目录，并可选进行 AI 分析，返回完整结果"""
-    try:
-        from pathlib import Path
-        
-        # 获取 AstrBot 数据目录
-        data_path = get_astrbot_data_path()
-        if isinstance(data_path, str):
-            data_path = Path(data_path)
-        
-        # 保存到插件数据目录（用于持久化存储）
-        plugin_data_path = data_path / "plugin_data" / "windows_control"
-        plugin_data_path.mkdir(parents=True, exist_ok=True)
-        
-        # 生成文件名
-        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        filepath = plugin_data_path / filename
-        
-        # 保存图片
-        with open(filepath, "wb") as f:
-            f.write(base64.b64decode(screenshot_data))
-        
-        result_text = f"截图已保存到: {filepath}"
-        
-        # 如果启用了视觉分析，调用 AI 分析截图
-        if enable_analysis:
-            try:
-                analysis = await analyze_screenshot_with_ai(str(filepath))
-                result_text += f"\n\n=== AI 视觉分析 ===\n{analysis}"
-            except Exception as e:
-                result_text += f"\n\n视觉分析失败: {str(e)}"
-        
-        return result_text
-    except Exception as e:
-        return f"保存截图失败: {str(e)}"
+
 
 
 @dataclass
@@ -611,33 +569,7 @@ class WindowsControlPlugin(Star):
             self.server_host = self.config.get('host')
             self.server_port = self.config.get('port')
             
-            # 读取视觉分析配置
-            vision_provider = self.config.get('vision_api_provider', 'openai')
-            vision_api_key = self.config.get('vision_api_key', '')
-            vision_endpoint = self.config.get('vision_api_endpoint', 'https://api.openai.com/v1')
-            vision_model = self.config.get('vision_model', 'gpt-4o')
-            enable_vision = self.config.get('enable_vision_analysis', True)
-            vision_prompt = self.config.get('vision_prompt', '')
-            
             logger.info(f"从 self.config 读取: host={self.server_host}, port={self.server_port}")
-            logger.info(f"视觉分析配置: provider={vision_provider}, model={vision_model}, enabled={enable_vision}")
-            
-            # 初始化视觉分析器
-            if enable_vision and vision_api_key:
-                vision_analyzer = VisionAnalyzer(
-                    api_provider=vision_provider,
-                    api_key=vision_api_key,
-                    api_endpoint=vision_endpoint,
-                    model=vision_model,
-                    custom_prompt=vision_prompt
-                )
-                set_vision_analyzer(vision_analyzer)
-                if vision_prompt:
-                    logger.info("视觉分析器已初始化（使用自定义提示词）")
-                else:
-                    logger.info("视觉分析器已初始化（使用默认提示词）")
-            elif enable_vision and not vision_api_key:
-                logger.warning("启用了视觉分析但未配置 API 密钥，请在面板中设置")
         else:
             logger.warning(f"self.config 为空或不是 dict: {self.config}")
         
@@ -678,7 +610,6 @@ class WindowsControlPlugin(Star):
             await self.controller_server.stop()
         # 清除全局变量
         set_controller_server(None)
-        set_vision_analyzer(None)
         logger.info("Windows 控制插件已卸载")
         
     def _check_connection(self) -> Tuple[bool, str]:
