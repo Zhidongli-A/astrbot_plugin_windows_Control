@@ -185,14 +185,14 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
     """鼠标移动工具"""
     name: str = "mouse_move"
     description: str = "移动鼠标到屏幕指定坐标位置"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {
             "x": {"type": "number", "description": "目标位置的 X 坐标（像素）"},
             "y": {"type": "number", "description": "目标位置的 Y 坐标（像素）"}
         },
         "required": ["x", "y"]
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         x = kwargs.get("x", 0)
@@ -219,13 +219,13 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
     """鼠标点击工具"""
     name: str = "mouse_click"
     description: str = "执行鼠标点击操作"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {
             "button": {"type": "string", "description": "鼠标按钮类型，可选值为 left（左键）、right（右键）、middle（中键），默认为 left"}
         },
         "required": []
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         button = kwargs.get("button", "left")
@@ -251,11 +251,11 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
     """鼠标右键点击工具"""
     name: str = "mouse_right_click"
     description: str = "执行鼠标右键点击操作"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {},
         "required": []
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         plugin = context.ctx
@@ -280,13 +280,13 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
     """输入字符串工具"""
     name: str = "type_string"
     description: str = "输入字符串文本（支持连续输入多个字符）"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {
             "text": {"type": "string", "description": "要输入的文本字符串"}
         },
         "required": ["text"]
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         text = kwargs.get("text", "")
@@ -312,13 +312,13 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
     """按键工具"""
     name: str = "press_key"
     description: str = "按下单个按键或组合键"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {
             "key": {"type": "string", "description": "按键名称。单键如 a, enter, esc；组合键用 + 连接，如 ctrl+c, alt+tab, win+d"}
         },
         "required": ["key"]
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         key = kwargs.get("key", "")
@@ -344,11 +344,11 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
     """截图工具"""
     name: str = "get_screenshot"
     description: str = "获取当前屏幕截图，用于查看操作后的屏幕状态"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {},
         "required": []
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         plugin = context.ctx
@@ -376,11 +376,11 @@ class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
     """获取屏幕信息工具"""
     name: str = "get_screen_info"
     description: str = "获取屏幕尺寸和鼠标位置信息"
-    parameters: dict = Field(default_factory=lambda: {
+    parameters: dict = {
         "type": "object",
         "properties": {},
         "required": []
-    })
+    }
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         plugin = context.ctx
