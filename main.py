@@ -14,10 +14,9 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Set
 from dataclasses import dataclass, field
 
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-import astrbot.api.message_components as Comp
 
 
 @dataclass
@@ -257,171 +256,144 @@ class WindowsControlPlugin(Star):
     # ==================== LLM 工具函数 ====================
     
     @filter.llm_tool(name="mouse_move")
-    async def llm_mouse_move(self, event: AstrMessageEvent, x: int, y: int) -> MessageEventResult:
+    async def llm_mouse_move(self, event: AstrMessageEvent, x: int, y: int) -> str:
         '''
         移动鼠标到屏幕指定坐标位置
         
         Args:
             x(int): 目标位置的 X 坐标（像素）
             y(int): 目标位置的 Y 坐标（像素）
+        
+        Returns:
+            操作结果描述，包含截图数据（如果有）
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(
             None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
         )
         
         if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "鼠标移动完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n当前屏幕状态：\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
-            else:
-                return event.plain_result(message)
+            return message
         else:
             error = result.get("error", "操作失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="mouse_click")
-    async def llm_mouse_click(self, event: AstrMessageEvent, button: str = "left") -> MessageEventResult:
+    async def llm_mouse_click(self, event: AstrMessageEvent, button: str = "left") -> str:
         '''
         执行鼠标点击操作
         
         Args:
             button(string): 鼠标按钮类型，可选值为 "left"（左键）、"right"（右键）、"middle"（中键），默认为 "left"
+        
+        Returns:
+            操作结果描述
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(
             None, "mouse_click", {"button": button, "clicks": 1}
         )
         
         if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "点击完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n当前屏幕状态：\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
-            else:
-                return event.plain_result(message)
+            return message
         else:
             error = result.get("error", "操作失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="mouse_right_click")
-    async def llm_mouse_right_click(self, event: AstrMessageEvent) -> MessageEventResult:
+    async def llm_mouse_right_click(self, event: AstrMessageEvent) -> str:
         '''
         执行鼠标右键点击操作
+        
+        Returns:
+            操作结果描述
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(
             None, "mouse_click", {"button": "right", "clicks": 1}
         )
         
         if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "右键点击完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n当前屏幕状态：\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
-            else:
-                return event.plain_result(message)
+            return message
         else:
             error = result.get("error", "操作失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="type_string")
-    async def llm_type_string(self, event: AstrMessageEvent, text: str) -> MessageEventResult:
+    async def llm_type_string(self, event: AstrMessageEvent, text: str) -> str:
         '''
         输入字符串文本（支持连续输入多个字符）
         
         Args:
             text(string): 要输入的文本字符串
+        
+        Returns:
+            操作结果描述
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(
             None, "type_string", {"text": text, "interval": 0.01}
         )
         
         if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "文本输入完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n当前屏幕状态：\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
-            else:
-                return event.plain_result(message)
+            return message
         else:
             error = result.get("error", "操作失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="press_key")
-    async def llm_press_key(self, event: AstrMessageEvent, key: str) -> MessageEventResult:
+    async def llm_press_key(self, event: AstrMessageEvent, key: str) -> str:
         '''
         按下单个按键或组合键
         
         Args:
             key(string): 按键名称。单键如 "a", "enter", "esc"；组合键用 + 连接，如 "ctrl+c", "alt+tab", "win+d"
+        
+        Returns:
+            操作结果描述
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(
             None, "key_press", {"key": key}
         )
         
         if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "按键操作完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n当前屏幕状态：\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
-            else:
-                return event.plain_result(message)
+            return message
         else:
             error = result.get("error", "操作失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="get_screenshot")
-    async def llm_get_screenshot(self, event: AstrMessageEvent) -> MessageEventResult:
+    async def llm_get_screenshot(self, event: AstrMessageEvent) -> str:
         '''
         获取当前屏幕截图，用于查看操作后的屏幕状态
+        
+        Returns:
+            截图结果描述（包含 base64 图片数据）
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         result = await self.controller_server.send_command(None, "screenshot")
         
@@ -430,25 +402,24 @@ class WindowsControlPlugin(Star):
             message = result.get("result", {}).get("message", "截图完成")
             
             if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                return event.chain_result(chain)
+                return f"{message}\n截图数据: {screenshot_data[:100]}..."
             else:
-                return event.plain_result("截图失败：无图像数据")
+                return "截图失败：无图像数据"
         else:
             error = result.get("error", "截图失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
             
     @filter.llm_tool(name="get_screen_info")
-    async def llm_get_screen_info(self, event: AstrMessageEvent) -> MessageEventResult:
+    async def llm_get_screen_info(self, event: AstrMessageEvent) -> str:
         '''
         获取屏幕尺寸和鼠标位置信息
+        
+        Returns:
+            屏幕信息描述
         '''
         connected, error_msg = self._check_connection()
         if not connected:
-            return event.plain_result(f"错误：{error_msg}")
+            return f"错误：{error_msg}"
             
         # 获取屏幕尺寸
         result_size = await self.controller_server.send_command(None, "get_screen_size")
@@ -463,7 +434,7 @@ class WindowsControlPlugin(Star):
 屏幕尺寸: {screen_size.get('width', '未知')} x {screen_size.get('height', '未知')}
 鼠标位置: ({mouse_pos.get('x', '未知')}, {mouse_pos.get('y', '未知')})"""
             
-            return event.plain_result(info)
+            return info
         else:
             error = result_size.get("error") or result_pos.get("error", "获取信息失败")
-            return event.plain_result(f"错误：{error}")
+            return f"错误：{error}"
