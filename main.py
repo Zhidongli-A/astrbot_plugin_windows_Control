@@ -14,10 +14,16 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Set
 from dataclasses import dataclass, field
 
+from pydantic import Field
+
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 import astrbot.api.message_components as Comp
+
+from astrbot.core.agent.run_context import ContextWrapper
+from astrbot.core.agent.tool import FunctionTool, ToolExecResult
+from astrbot.core.astr_agent_context import AstrAgentContext
 
 
 @dataclass
@@ -172,6 +178,236 @@ class ControllerServer:
         return len(self.clients) > 0
 
 
+# ==================== FunctionTool 类定义 ====================
+
+@dataclass
+class MouseMoveTool(FunctionTool[AstrAgentContext]):
+    """鼠标移动工具"""
+    name: str = "mouse_move"
+    description: str = "移动鼠标到屏幕指定坐标位置"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {
+            "x": {"type": "number", "description": "目标位置的 X 坐标（像素）"},
+            "y": {"type": "number", "description": "目标位置的 Y 坐标（像素）"}
+        },
+        "required": ["x", "y"]
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        x = kwargs.get("x", 0)
+        y = kwargs.get("y", 0)
+        # 获取插件实例
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(
+            None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
+        )
+        
+        if result.get("status") == "success":
+            message = result.get("result", {}).get("message", "鼠标移动完成")
+            return ToolExecResult(result=message)
+        else:
+            return ToolExecResult(error=result.get("error", "操作失败"))
+
+
+@dataclass
+class MouseClickTool(FunctionTool[AstrAgentContext]):
+    """鼠标点击工具"""
+    name: str = "mouse_click"
+    description: str = "执行鼠标点击操作"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {
+            "button": {"type": "string", "description": "鼠标按钮类型，可选值为 left（左键）、right（右键）、middle（中键），默认为 left"}
+        },
+        "required": []
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        button = kwargs.get("button", "left")
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(
+            None, "mouse_click", {"button": button, "clicks": 1}
+        )
+        
+        if result.get("status") == "success":
+            message = result.get("result", {}).get("message", "点击完成")
+            return ToolExecResult(result=message)
+        else:
+            return ToolExecResult(error=result.get("error", "操作失败"))
+
+
+@dataclass
+class MouseRightClickTool(FunctionTool[AstrAgentContext]):
+    """鼠标右键点击工具"""
+    name: str = "mouse_right_click"
+    description: str = "执行鼠标右键点击操作"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {},
+        "required": []
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(
+            None, "mouse_click", {"button": "right", "clicks": 1}
+        )
+        
+        if result.get("status") == "success":
+            message = result.get("result", {}).get("message", "右键点击完成")
+            return ToolExecResult(result=message)
+        else:
+            return ToolExecResult(error=result.get("error", "操作失败"))
+
+
+@dataclass
+class TypeStringTool(FunctionTool[AstrAgentContext]):
+    """输入字符串工具"""
+    name: str = "type_string"
+    description: str = "输入字符串文本（支持连续输入多个字符）"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string", "description": "要输入的文本字符串"}
+        },
+        "required": ["text"]
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        text = kwargs.get("text", "")
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(
+            None, "type_string", {"text": text, "interval": 0.01}
+        )
+        
+        if result.get("status") == "success":
+            message = result.get("result", {}).get("message", "文本输入完成")
+            return ToolExecResult(result=message)
+        else:
+            return ToolExecResult(error=result.get("error", "操作失败"))
+
+
+@dataclass
+class PressKeyTool(FunctionTool[AstrAgentContext]):
+    """按键工具"""
+    name: str = "press_key"
+    description: str = "按下单个按键或组合键"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {
+            "key": {"type": "string", "description": "按键名称。单键如 a, enter, esc；组合键用 + 连接，如 ctrl+c, alt+tab, win+d"}
+        },
+        "required": ["key"]
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        key = kwargs.get("key", "")
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(
+            None, "key_press", {"key": key}
+        )
+        
+        if result.get("status") == "success":
+            message = result.get("result", {}).get("message", "按键操作完成")
+            return ToolExecResult(result=message)
+        else:
+            return ToolExecResult(error=result.get("error", "操作失败"))
+
+
+@dataclass
+class GetScreenshotTool(FunctionTool[AstrAgentContext]):
+    """截图工具"""
+    name: str = "get_screenshot"
+    description: str = "获取当前屏幕截图，用于查看操作后的屏幕状态"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {},
+        "required": []
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        result = await plugin.controller_server.send_command(None, "screenshot")
+        
+        if result.get("status") == "success":
+            screenshot_data = result.get("result", {}).get("screenshot")
+            message = result.get("result", {}).get("message", "截图完成")
+            if screenshot_data:
+                return ToolExecResult(result=f"{message}\n截图数据: {screenshot_data[:100]}...")
+            else:
+                return ToolExecResult(error="截图失败：无图像数据")
+        else:
+            return ToolExecResult(error=result.get("error", "截图失败"))
+
+
+@dataclass
+class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
+    """获取屏幕信息工具"""
+    name: str = "get_screen_info"
+    description: str = "获取屏幕尺寸和鼠标位置信息"
+    parameters: dict = Field(default_factory=lambda: {
+        "type": "object",
+        "properties": {},
+        "required": []
+    })
+    
+    async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
+        plugin = context.ctx
+        if not plugin or not plugin.controller_server:
+            return ToolExecResult(error="插件未初始化")
+        if not plugin.controller_server.has_connected_client():
+            return ToolExecResult(error="没有本地控制端连接")
+        
+        # 获取屏幕尺寸
+        result_size = await plugin.controller_server.send_command(None, "get_screen_size")
+        # 获取鼠标位置
+        result_pos = await plugin.controller_server.send_command(None, "get_mouse_position")
+        
+        if result_size.get("status") == "success" and result_pos.get("status") == "success":
+            screen_size = result_size.get("result", {}).get("screen_size", {})
+            mouse_pos = result_pos.get("result", {}).get("position", {})
+            
+            info = f"""屏幕信息：
+屏幕尺寸: {screen_size.get('width', '未知')} x {screen_size.get('height', '未知')}
+鼠标位置: ({mouse_pos.get('x', '未知')}, {mouse_pos.get('y', '未知')})"""
+            
+            return ToolExecResult(result=info)
+        else:
+            error = result_size.get("error") or result_pos.get("error", "获取信息失败")
+            return ToolExecResult(error=error)
+
+
 @register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "v1.0.1")
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
@@ -183,6 +419,39 @@ class WindowsControlPlugin(Star):
         self.controller_server: Optional[ControllerServer] = None
         self.server_host = None
         self.server_port = None
+        
+        # 注册 FunctionTool 工具
+        self._register_tools()
+        
+    def _register_tools(self):
+        """注册 FunctionTool 工具到 AstrBot"""
+        try:
+            # 创建工具实例，传入插件实例作为上下文
+            tools = [
+                MouseMoveTool(),
+                MouseClickTool(),
+                MouseRightClickTool(),
+                TypeStringTool(),
+                PressKeyTool(),
+                GetScreenshotTool(),
+                GetScreenInfoTool()
+            ]
+            
+            # 设置插件实例到工具的上下文中
+            for tool in tools:
+                # FunctionTool 会通过 ContextWrapper 访问插件实例
+                pass
+            
+            # 注册工具到 AstrBot (v4.5.1+)
+            if hasattr(self.context, 'add_llm_tools'):
+                self.context.add_llm_tools(*tools)
+                logger.info(f"已注册 {len(tools)} 个 FunctionTool 工具")
+            else:
+                # 旧版本兼容
+                logger.warning("当前 AstrBot 版本不支持 add_llm_tools，请升级到 v4.5.1+")
+                
+        except Exception as e:
+            logger.error(f"注册工具失败: {e}")
         
     async def initialize(self):
         """插件初始化"""
@@ -238,178 +507,4 @@ class WindowsControlPlugin(Star):
             return False, "没有本地控制端连接"
         return True, ""
         
-    # ==================== LLM 工具函数 ====================
-    
-    @filter.llm_tool(name="mouse_move")
-    async def llm_mouse_move(self, event: AstrMessageEvent, x: int, y: int):
-        '''
-        移动鼠标到屏幕指定坐标位置
-        
-        Args:
-            x(int): 目标位置的 X 坐标（像素）
-            y(int): 目标位置的 Y 坐标（像素）
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(
-            None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
-        )
-        
-        if result.get("status") == "success":
-            message = result.get("result", {}).get("message", "鼠标移动完成")
-            yield event.plain_result(message)
-        else:
-            error = result.get("error", "操作失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="mouse_click")
-    async def llm_mouse_click(self, event: AstrMessageEvent, button: str = "left"):
-        '''
-        执行鼠标点击操作
-        
-        Args:
-            button(string): 鼠标按钮类型，可选值为 "left"（左键）、"right"（右键）、"middle"（中键），默认为 "left"
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(
-            None, "mouse_click", {"button": button, "clicks": 1}
-        )
-        
-        if result.get("status") == "success":
-            message = result.get("result", {}).get("message", "点击完成")
-            yield event.plain_result(message)
-        else:
-            error = result.get("error", "操作失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="mouse_right_click")
-    async def llm_mouse_right_click(self, event: AstrMessageEvent):
-        '''
-        执行鼠标右键点击操作
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(
-            None, "mouse_click", {"button": "right", "clicks": 1}
-        )
-        
-        if result.get("status") == "success":
-            message = result.get("result", {}).get("message", "右键点击完成")
-            yield event.plain_result(message)
-        else:
-            error = result.get("error", "操作失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="type_string")
-    async def llm_type_string(self, event: AstrMessageEvent, text: str):
-        '''
-        输入字符串文本（支持连续输入多个字符）
-        
-        Args:
-            text(string): 要输入的文本字符串
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(
-            None, "type_string", {"text": text, "interval": 0.01}
-        )
-        
-        if result.get("status") == "success":
-            message = result.get("result", {}).get("message", "文本输入完成")
-            yield event.plain_result(message)
-        else:
-            error = result.get("error", "操作失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="press_key")
-    async def llm_press_key(self, event: AstrMessageEvent, key: str):
-        '''
-        按下单个按键或组合键
-        
-        Args:
-            key(string): 按键名称。单键如 "a", "enter", "esc"；组合键用 + 连接，如 "ctrl+c", "alt+tab", "win+d"
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(
-            None, "key_press", {"key": key}
-        )
-        
-        if result.get("status") == "success":
-            message = result.get("result", {}).get("message", "按键操作完成")
-            yield event.plain_result(message)
-        else:
-            error = result.get("error", "操作失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="get_screenshot")
-    async def llm_get_screenshot(self, event: AstrMessageEvent):
-        '''
-        获取当前屏幕截图，用于查看操作后的屏幕状态
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        result = await self.controller_server.send_command(None, "screenshot")
-        
-        if result.get("status") == "success":
-            screenshot_data = result.get("result", {}).get("screenshot")
-            message = result.get("result", {}).get("message", "截图完成")
-            
-            if screenshot_data:
-                chain = [
-                    Comp.Plain(f"{message}\n"),
-                    Comp.Image.fromURL(screenshot_data)
-                ]
-                yield event.chain_result(chain)
-            else:
-                yield event.plain_result("截图失败：无图像数据")
-        else:
-            error = result.get("error", "截图失败")
-            yield event.plain_result(f"错误：{error}")
-            
-    @filter.llm_tool(name="get_screen_info")
-    async def llm_get_screen_info(self, event: AstrMessageEvent):
-        '''
-        获取屏幕尺寸和鼠标位置信息
-        '''
-        connected, error_msg = self._check_connection()
-        if not connected:
-            yield event.plain_result(f"错误：{error_msg}")
-            return
-            
-        # 获取屏幕尺寸
-        result_size = await self.controller_server.send_command(None, "get_screen_size")
-        # 获取鼠标位置
-        result_pos = await self.controller_server.send_command(None, "get_mouse_position")
-        
-        if result_size.get("status") == "success" and result_pos.get("status") == "success":
-            screen_size = result_size.get("result", {}).get("screen_size", {})
-            mouse_pos = result_pos.get("result", {}).get("position", {})
-            
-            info = f"""屏幕信息：
-屏幕尺寸: {screen_size.get('width', '未知')} x {screen_size.get('height', '未知')}
-鼠标位置: ({mouse_pos.get('x', '未知')}, {mouse_pos.get('y', '未知')})"""
-            
-            yield event.plain_result(info)
-        else:
-            error = result_size.get("error") or result_pos.get("error", "获取信息失败")
-            yield event.plain_result(f"错误：{error}")
+
