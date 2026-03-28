@@ -14,8 +14,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Set
 from dataclasses import dataclass, field
 
-from pydantic import Field
-
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
@@ -24,6 +22,21 @@ import astrbot.api.message_components as Comp
 from astrbot.core.agent.run_context import ContextWrapper
 from astrbot.core.agent.tool import FunctionTool, ToolExecResult
 from astrbot.core.astr_agent_context import AstrAgentContext
+
+
+# 全局变量，用于存储 controller_server 实例
+_controller_server_instance: Optional['ControllerServer'] = None
+
+
+def get_controller_server() -> Optional['ControllerServer']:
+    """获取全局 controller_server 实例"""
+    return _controller_server_instance
+
+
+def set_controller_server(server: Optional['ControllerServer']):
+    """设置全局 controller_server 实例"""
+    global _controller_server_instance
+    _controller_server_instance = server
 
 
 @dataclass
@@ -197,13 +210,15 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         x = kwargs.get("x", 0)
         y = kwargs.get("y", 0)
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        
+        # 通过全局变量获取 controller_server
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(
+        result = await controller_server.send_command(
             None, "mouse_move", {"x": x, "y": y, "duration": 0.5}
         )
         
@@ -229,13 +244,14 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         button = kwargs.get("button", "left")
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(
+        result = await controller_server.send_command(
             None, "mouse_click", {"button": button, "clicks": 1}
         )
         
@@ -258,13 +274,13 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
     })
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(
+        result = await controller_server.send_command(
             None, "mouse_click", {"button": "right", "clicks": 1}
         )
         
@@ -290,13 +306,14 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         text = kwargs.get("text", "")
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(
+        result = await controller_server.send_command(
             None, "type_string", {"text": text, "interval": 0.01}
         )
         
@@ -322,13 +339,14 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
         key = kwargs.get("key", "")
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(
+        result = await controller_server.send_command(
             None, "key_press", {"key": key}
         )
         
@@ -351,13 +369,13 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
     })
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
-        result = await plugin.controller_server.send_command(None, "screenshot")
+        result = await controller_server.send_command(None, "screenshot")
         
         if result.get("status") == "success":
             screenshot_data = result.get("result", {}).get("screenshot")
@@ -383,16 +401,16 @@ class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
     })
     
     async def call(self, context: ContextWrapper[AstrAgentContext], **kwargs) -> ToolExecResult:
-        plugin = context.ctx
-        if not plugin or not plugin.controller_server:
+        controller_server = get_controller_server()
+        if not controller_server:
             return ToolExecResult(error="插件未初始化")
-        if not plugin.controller_server.has_connected_client():
+        if not controller_server.has_connected_client():
             return ToolExecResult(error="没有本地控制端连接")
         
         # 获取屏幕尺寸
-        result_size = await plugin.controller_server.send_command(None, "get_screen_size")
+        result_size = await controller_server.send_command(None, "get_screen_size")
         # 获取鼠标位置
-        result_pos = await plugin.controller_server.send_command(None, "get_mouse_position")
+        result_pos = await controller_server.send_command(None, "get_mouse_position")
         
         if result_size.get("status") == "success" and result_pos.get("status") == "success":
             screen_size = result_size.get("result", {}).get("screen_size", {})
@@ -426,7 +444,7 @@ class WindowsControlPlugin(Star):
     def _register_tools(self):
         """注册 FunctionTool 工具到 AstrBot"""
         try:
-            # 创建工具实例，传入插件实例作为上下文
+            # 创建工具实例
             tools = [
                 MouseMoveTool(),
                 MouseClickTool(),
@@ -436,11 +454,6 @@ class WindowsControlPlugin(Star):
                 GetScreenshotTool(),
                 GetScreenInfoTool()
             ]
-            
-            # 设置插件实例到工具的上下文中
-            for tool in tools:
-                # FunctionTool 会通过 ContextWrapper 访问插件实例
-                pass
             
             # 注册工具到 AstrBot (v4.5.1+)
             if hasattr(self.context, 'add_llm_tools'):
@@ -485,6 +498,9 @@ class WindowsControlPlugin(Star):
             port=self.server_port
         )
         
+        # 设置全局变量，供工具类使用
+        set_controller_server(self.controller_server)
+        
         # 启动服务端
         success = await self.controller_server.start()
         
@@ -497,6 +513,8 @@ class WindowsControlPlugin(Star):
         """插件销毁"""
         if self.controller_server:
             await self.controller_server.stop()
+        # 清除全局变量
+        set_controller_server(None)
         logger.info("Windows 控制插件已卸载")
         
     def _check_connection(self) -> tuple[bool, str]:
@@ -506,5 +524,3 @@ class WindowsControlPlugin(Star):
         if not self.controller_server.has_connected_client():
             return False, "没有本地控制端连接"
         return True, ""
-        
-
