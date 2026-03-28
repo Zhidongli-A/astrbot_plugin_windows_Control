@@ -48,17 +48,63 @@ def set_controller_server(server: Optional['ControllerServer']):
     _controller_server_instance = server
 
 
+async def save_screenshot_to_temp(screenshot_data: str) -> str:
+    """
+    保存截图到 AstrBot 临时目录，返回文件路径
+    根据 AstrBot 框架规范，工具返回的图片会被缓存到 data/temp/tool_images/
+    """
+    try:
+        from pathlib import Path
+        
+        # 获取 AstrBot 数据目录
+        data_path = get_astrbot_data_path()
+        if isinstance(data_path, str):
+            data_path = Path(data_path)
+        
+        # 保存到 AstrBot 的 tool_images 临时目录
+        temp_image_path = data_path / "temp" / "tool_images"
+        temp_image_path.mkdir(parents=True, exist_ok=True)
+        
+        # 生成文件名
+        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        filepath = temp_image_path / filename
+        
+        # 保存图片
+        with open(filepath, "wb") as f:
+            f.write(base64.b64decode(screenshot_data))
+        
+        return str(filepath)
+    except Exception as e:
+        logger.error(f"保存截图失败: {str(e)}")
+        return ""
+
+
+def create_tool_result_with_image(message: str, image_path: str) -> dict:
+    """
+    创建符合 AstrBot 规范的工具返回结果，包含图片
+    
+    根据 AstrBot 框架规范，工具返回图片需要：
+    1. 将图片保存到 data/temp/tool_images/ 目录
+    2. 返回包含图片路径的特殊格式，让框架识别并注入到 Agent 上下文
+    """
+    return {
+        "type": "mixed",
+        "text": message,
+        "image_path": image_path
+    }
+
+
 async def save_and_analyze_screenshot(screenshot_data: str, enable_analysis: bool = True) -> str:
     """保存截图到插件数据目录，并可选进行 AI 分析，返回完整结果"""
     try:
         from pathlib import Path
-        import os
         
-        # 获取插件数据目录
+        # 获取 AstrBot 数据目录
         data_path = get_astrbot_data_path()
-        # 如果返回的是字符串，转换为 Path 对象
         if isinstance(data_path, str):
             data_path = Path(data_path)
+        
+        # 保存到插件数据目录（用于持久化存储）
         plugin_data_path = data_path / "plugin_data" / "windows_control"
         plugin_data_path.mkdir(parents=True, exist_ok=True)
         
@@ -272,8 +318,12 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "鼠标移动完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -309,8 +359,12 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -342,8 +396,12 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "右键点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -379,8 +437,12 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "文本输入完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -416,8 +478,12 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "按键操作完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -447,8 +513,12 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                screenshot_result = await save_and_analyze_screenshot(screenshot_data)
-                return f"{message}\n{screenshot_result}"
+                # 保存截图到临时目录，让 AstrBot 框架识别
+                image_path = await save_screenshot_to_temp(screenshot_data)
+                if image_path:
+                    # 返回包含图片路径的字典格式
+                    return create_tool_result_with_image(message, image_path)
+                return message
             else:
                 return "错误：截图失败，无图像数据"
         else:
