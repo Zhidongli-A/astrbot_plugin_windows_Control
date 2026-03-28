@@ -542,6 +542,7 @@ class WindowsControlPlugin(Star):
             vision_endpoint = self.config.get('vision_api_endpoint', 'https://api.openai.com/v1')
             vision_model = self.config.get('vision_model', 'gpt-4o')
             enable_vision = self.config.get('enable_vision_analysis', True)
+            vision_prompt = self.config.get('vision_prompt', '')
             
             logger.info(f"从 self.config 读取: host={self.server_host}, port={self.server_port}")
             logger.info(f"视觉分析配置: provider={vision_provider}, model={vision_model}, enabled={enable_vision}")
@@ -552,10 +553,14 @@ class WindowsControlPlugin(Star):
                     api_provider=vision_provider,
                     api_key=vision_api_key,
                     api_endpoint=vision_endpoint,
-                    model=vision_model
+                    model=vision_model,
+                    custom_prompt=vision_prompt
                 )
                 set_vision_analyzer(vision_analyzer)
-                logger.info("视觉分析器已初始化")
+                if vision_prompt:
+                    logger.info("视觉分析器已初始化（使用自定义提示词）")
+                else:
+                    logger.info("视觉分析器已初始化（使用默认提示词）")
             elif enable_vision and not vision_api_key:
                 logger.warning("启用了视觉分析但未配置 API 密钥，请在面板中设置")
         else:

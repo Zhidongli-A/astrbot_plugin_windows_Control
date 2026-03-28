@@ -38,5 +38,11 @@
     "type": "bool",
     "hint": "是否在每次操作后自动分析屏幕截图",
     "default": true
+  },
+  "vision_prompt": {
+    "description": "视觉分析提示词",
+    "type": "string",
+    "hint": "自定义 AI 分析截图时的提示词。留空将使用默认提示词。提示词应该指导 AI 识别 UI 元素、坐标位置和文字内容",
+    "default": ""
   }
 }
