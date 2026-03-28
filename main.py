@@ -22,6 +22,7 @@ import astrbot.api.message_components as Comp
 from astrbot.core.agent.run_context import ContextWrapper
 from astrbot.core.agent.tool import FunctionTool, ToolExecResult
 from astrbot.core.astr_agent_context import AstrAgentContext
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 
 # 全局变量，用于存储 controller_server 实例
@@ -381,8 +382,27 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                # 直接返回截图数据，由 Agent 处理展示
-                return f"{message}\n截图数据已获取"
+                # 保存截图到插件数据目录
+                try:
+                    import os
+                    from pathlib import Path
+                    
+                    # 获取插件数据目录
+                    plugin_data_path = get_astrbot_data_path() / "plugin_data" / "windows_control"
+                    plugin_data_path.mkdir(parents=True, exist_ok=True)
+                    
+                    # 生成文件名
+                    filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    filepath = plugin_data_path / filename
+                    
+                    # 保存图片
+                    with open(filepath, "wb") as f:
+                        f.write(base64.b64decode(screenshot_data))
+                    
+                    # 返回图片路径
+                    return f"{message}\n截图已保存到: {filepath}"
+                except Exception as e:
+                    return f"{message}\n截图数据已获取，但保存失败: {str(e)}"
             else:
                 return "错误：截图失败，无图像数据"
         else:
