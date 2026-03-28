@@ -40,6 +40,28 @@ def set_controller_server(server: Optional['ControllerServer']):
     _controller_server_instance = server
 
 
+def save_screenshot(screenshot_data: str) -> str:
+    """保存截图到插件数据目录，返回文件路径"""
+    try:
+        from pathlib import Path
+        
+        # 获取插件数据目录
+        plugin_data_path = get_astrbot_data_path() / "plugin_data" / "windows_control"
+        plugin_data_path.mkdir(parents=True, exist_ok=True)
+        
+        # 生成文件名
+        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        filepath = plugin_data_path / filename
+        
+        # 保存图片
+        with open(filepath, "wb") as f:
+            f.write(base64.b64decode(screenshot_data))
+        
+        return str(filepath)
+    except Exception as e:
+        return f"保存截图失败: {str(e)}"
+
+
 @dataclass
 class ControllerClient:
     """控制器客户端信息"""
@@ -225,6 +247,10 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "鼠标移动完成")
+            screenshot_data = result.get("result", {}).get("screenshot")
+            if screenshot_data:
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -258,6 +284,10 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "点击完成")
+            screenshot_data = result.get("result", {}).get("screenshot")
+            if screenshot_data:
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -287,6 +317,10 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "右键点击完成")
+            screenshot_data = result.get("result", {}).get("screenshot")
+            if screenshot_data:
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -320,6 +354,10 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "文本输入完成")
+            screenshot_data = result.get("result", {}).get("screenshot")
+            if screenshot_data:
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -353,6 +391,10 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
         
         if result.get("status") == "success":
             message = result.get("result", {}).get("message", "按键操作完成")
+            screenshot_data = result.get("result", {}).get("screenshot")
+            if screenshot_data:
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -382,27 +424,8 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                # 保存截图到插件数据目录
-                try:
-                    import os
-                    from pathlib import Path
-                    
-                    # 获取插件数据目录
-                    plugin_data_path = get_astrbot_data_path() / "plugin_data" / "windows_control"
-                    plugin_data_path.mkdir(parents=True, exist_ok=True)
-                    
-                    # 生成文件名
-                    filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                    filepath = plugin_data_path / filename
-                    
-                    # 保存图片
-                    with open(filepath, "wb") as f:
-                        f.write(base64.b64decode(screenshot_data))
-                    
-                    # 返回图片路径
-                    return f"{message}\n截图已保存到: {filepath}"
-                except Exception as e:
-                    return f"{message}\n截图数据已获取，但保存失败: {str(e)}"
+                filepath = save_screenshot(screenshot_data)
+                return f"{message}\n截图: {filepath}"
             else:
                 return "错误：截图失败，无图像数据"
         else:
