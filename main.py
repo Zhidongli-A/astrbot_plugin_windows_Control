@@ -44,6 +44,8 @@ async def save_screenshot_to_temp(screenshot_data: str) -> str:
     """
     保存截图到 AstrBot 临时目录，返回文件路径
     根据 AstrBot 框架规范，工具返回的图片会被缓存到 data/temp/tool_images/
+    
+    支持处理 data:image/jpeg;base64, 或 data:image/png;base64, 前缀的 base64 数据
     """
     try:
         from pathlib import Path
@@ -57,8 +59,20 @@ async def save_screenshot_to_temp(screenshot_data: str) -> str:
         temp_image_path = data_path / "temp" / "tool_images"
         temp_image_path.mkdir(parents=True, exist_ok=True)
         
-        # 生成文件名
-        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        # 判断图片格式并去除 base64 前缀
+        image_format = "png"  # 默认格式
+        if screenshot_data.startswith("data:image/jpeg;base64,"):
+            screenshot_data = screenshot_data[len("data:image/jpeg;base64,"):]
+            image_format = "jpg"
+        elif screenshot_data.startswith("data:image/jpg;base64,"):
+            screenshot_data = screenshot_data[len("data:image/jpg;base64,"):]
+            image_format = "jpg"
+        elif screenshot_data.startswith("data:image/png;base64,"):
+            screenshot_data = screenshot_data[len("data:image/png;base64,"):]
+            image_format = "png"
+        
+        # 生成文件名（使用正确的扩展名）
+        filename = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{image_format}"
         filepath = temp_image_path / filename
         
         # 保存图片
