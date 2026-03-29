@@ -42,13 +42,12 @@ def set_controller_server(server: Optional['ControllerServer']):
     _controller_server_instance = server
 
 
-def screenshot_data_to_imagecontent(screenshot_data: str, message: str = ""):
+def screenshot_data_to_imagecontent(screenshot_data: str):
     """
     将截图数据转换为 ImageContent 格式，让 LLM 直接"看到"图片
     
     Args:
         screenshot_data: 包含 data:image/jpeg;base64, 前缀的 base64 图片数据
-        message:  accompanying message
         
     Returns:
         CallToolResult 包含 ImageContent
@@ -72,13 +71,10 @@ def screenshot_data_to_imagecontent(screenshot_data: str, message: str = ""):
             screenshot_data = screenshot_data[len("data:image/webp;base64,"):]
             mime_type = "image/webp"
         
-        # 构建返回内容
-        content = []
-        if message:
-            content.append(TextContent(type="text", text=message))
-        content.append(ImageContent(type="image", data=screenshot_data, mimeType=mime_type))
-        
-        return CallToolResult(content=content)
+        # 只返回图片，不返回文本
+        return CallToolResult(content=[
+            ImageContent(type="image", data=screenshot_data, mimeType=mime_type)
+        ])
     except Exception as e:
         logger.error(f"转换截图数据失败: {str(e)}")
         return CallToolResult(content=[TextContent(type="text", text=f"处理截图失败: {str(e)}")])
@@ -275,7 +271,7 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -312,7 +308,7 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -345,7 +341,7 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -382,7 +378,7 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -419,7 +415,7 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             return message
         else:
             return f"错误：{result.get('error', '操作失败')}"
@@ -450,7 +446,7 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
                 # 使用 ImageContent 让 LLM 直接看到图片
-                return screenshot_data_to_imagecontent(screenshot_data, message)
+                return screenshot_data_to_imagecontent(screenshot_data)
             else:
                 return "错误：截图失败，无图像数据"
         else:
