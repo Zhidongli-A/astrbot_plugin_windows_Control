@@ -19,15 +19,13 @@ class ScreenCapture:
         pass
         
     def capture(self, region: Optional[Tuple[int, int, int, int]] = None, 
-                quality: int = 85, 
-                resize: Optional[Tuple[int, int]] = None) -> str:
+                quality: int = 85) -> str:
         """
         截取屏幕并返回 base64 编码的图像
         
         Args:
             region: 截图区域 (left, top, width, height)，None 表示全屏
             quality: JPEG 质量 (1-100)
-            resize: 调整尺寸 (width, height)，None 表示不调整
             
         Returns:
             base64 编码的图像字符串 (data:image/jpeg;base64,...)
@@ -37,10 +35,6 @@ class ScreenCapture:
             screenshot = pyautogui.screenshot(region=region)
         else:
             screenshot = pyautogui.screenshot()
-            
-        # 调整尺寸（如果需要）
-        if resize:
-            screenshot = screenshot.resize(resize, Image.Resampling.LANCZOS)
             
         # 转换为 JPEG 并压缩
         buffer = BytesIO()
@@ -119,33 +113,3 @@ class ScreenCapture:
             
         screenshot.save(filepath, format=format)
         return filepath
-
-
-# 测试代码
-if __name__ == "__main__":
-    import time
-    
-    print("3秒后开始截图测试...")
-    time.sleep(3)
-    
-    capture = ScreenCapture()
-    
-    # 测试全屏截图
-    print("测试全屏截图...")
-    screen_size = capture.get_screen_size()
-    print(f"屏幕尺寸: {screen_size['width']}x{screen_size['height']}")
-    
-    img_base64 = capture.capture()
-    print(f"截图完成，base64长度: {len(img_base64)}")
-    
-    # 测试区域截图
-    print("测试区域截图...")
-    img_base64_region = capture.capture_region(100, 100, 400, 300)
-    print(f"区域截图完成，base64长度: {len(img_base64_region)}")
-    
-    # 测试鼠标周围截图
-    print("测试鼠标周围截图...")
-    img_base64_mouse = capture.capture_at_mouse()
-    print(f"鼠标周围截图完成，base64长度: {len(img_base64_mouse)}")
-    
-    print("测试完成")

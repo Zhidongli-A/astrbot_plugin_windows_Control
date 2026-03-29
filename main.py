@@ -490,7 +490,7 @@ class GetScreenInfoTool(FunctionTool[AstrAgentContext]):
             return f"错误：{error}"
 
 
-@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "v1.0.1")
+@register("windows_control", "枝动力", "Windows 远程控制插件 - 服务端模式，等待本地控制端主动连接", "v1.0.2")
 class WindowsControlPlugin(Star):
     """Windows 远程控制插件主类 - 服务端模式"""
     
@@ -533,21 +533,13 @@ class WindowsControlPlugin(Star):
     async def initialize(self):
         """插件初始化"""
         # 从配置中读取设置
-        # AstrBot 会将 _conf_schema.json 中的配置作为 dict 传入 __init__ 的 config 参数
-        
         if self.config and isinstance(self.config, dict):
             self.server_host = self.config.get('host')
             self.server_port = self.config.get('port')
-            
-            logger.info(f"从 self.config 读取: host={self.server_host}, port={self.server_port}")
-        else:
-            logger.warning(f"self.config 为空或不是 dict: {self.config}")
         
         # 处理值
         self.server_host = str(self.server_host).strip() if self.server_host else ""
         self.server_port = int(self.server_port) if self.server_port else None
-        
-        logger.info(f"最终配置: host='{self.server_host}', port={self.server_port}")
         
         # 检查必要配置
         if not self.server_host:
