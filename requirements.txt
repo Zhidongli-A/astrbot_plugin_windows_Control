@@ -3,6 +3,9 @@
 # WebSocket 通信
 websockets>=11.0.0
 
+# 网络请求（view_image 工具需要）
+aiohttp>=3.8.0
+
 # 本地控制端依赖（仅在 Windows 上需要）
 pyautogui>=0.9.54
 Pillow>=10.0.0

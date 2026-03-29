@@ -19,6 +19,14 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 import astrbot.api.message_components as Comp
 
+# 导入 MCP 类型（AstrBot 借用 MCP 协议的类型定义）
+try:
+    from mcp.types import CallToolResult, ImageContent, TextContent
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+    logger.warning("mcp 模块未安装，view_image 工具将不可用")
+
 from astrbot.core.agent.run_context import ContextWrapper
 from astrbot.core.agent.tool import FunctionTool, ToolExecResult
 from astrbot.core.astr_agent_context import AstrAgentContext
@@ -98,6 +106,51 @@ def create_tool_result_with_image(message: str, image_path: str) -> dict:
         "text": message,
         "image_path": image_path
     }
+
+
+def screenshot_data_to_imagecontent(screenshot_data: str, message: str = ""):
+    """
+    将截图数据转换为 ImageContent 格式，让 LLM 直接"看到"图片
+    
+    Args:
+        screenshot_data: 包含 data:image/jpeg;base64, 前缀的 base64 图片数据
+        message:  accompanying message
+        
+    Returns:
+        CallToolResult 包含 ImageContent，或错误信息
+    """
+    if not MCP_AVAILABLE:
+        return None  # 返回 None 表示需要使用旧的方式
+    
+    try:
+        # 判断图片格式并去除 base64 前缀
+        mime_type = "image/jpeg"  # 默认格式
+        if screenshot_data.startswith("data:image/jpeg;base64,"):
+            screenshot_data = screenshot_data[len("data:image/jpeg;base64,"):]
+            mime_type = "image/jpeg"
+        elif screenshot_data.startswith("data:image/jpg;base64,"):
+            screenshot_data = screenshot_data[len("data:image/jpg;base64,"):]
+            mime_type = "image/jpeg"
+        elif screenshot_data.startswith("data:image/png;base64,"):
+            screenshot_data = screenshot_data[len("data:image/png;base64,"):]
+            mime_type = "image/png"
+        elif screenshot_data.startswith("data:image/gif;base64,"):
+            screenshot_data = screenshot_data[len("data:image/gif;base64,"):]
+            mime_type = "image/gif"
+        elif screenshot_data.startswith("data:image/webp;base64,"):
+            screenshot_data = screenshot_data[len("data:image/webp;base64,"):]
+            mime_type = "image/webp"
+        
+        # 构建返回内容
+        content = []
+        if message:
+            content.append(TextContent(type="text", text=message))
+        content.append(ImageContent(type="image", data=screenshot_data, mimeType=mime_type))
+        
+        return CallToolResult(content=content)
+    except Exception as e:
+        logger.error(f"转换截图数据失败: {str(e)}")
+        return None
 
 
 
@@ -290,10 +343,13 @@ class MouseMoveTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "鼠标移动完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             return message
@@ -331,10 +387,13 @@ class MouseClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             return message
@@ -368,10 +427,13 @@ class MouseRightClickTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "右键点击完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             return message
@@ -409,10 +471,13 @@ class TypeStringTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "文本输入完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             return message
@@ -450,10 +515,13 @@ class PressKeyTool(FunctionTool[AstrAgentContext]):
             message = result.get("result", {}).get("message", "按键操作完成")
             screenshot_data = result.get("result", {}).get("screenshot")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             return message
@@ -485,10 +553,13 @@ class GetScreenshotTool(FunctionTool[AstrAgentContext]):
             screenshot_data = result.get("result", {}).get("screenshot")
             message = result.get("result", {}).get("message", "截图完成")
             if screenshot_data:
-                # 保存截图到临时目录，让 AstrBot 框架识别
+                # 优先使用 ImageContent 让 LLM 直接看到图片
+                image_result = screenshot_data_to_imagecontent(screenshot_data, message)
+                if image_result:
+                    return image_result
+                # 降级到旧的方式
                 image_path = await save_screenshot_to_temp(screenshot_data)
                 if image_path:
-                    # 返回包含图片路径的字典格式
                     return create_tool_result_with_image(message, image_path)
                 return message
             else:
@@ -545,6 +616,7 @@ class WindowsControlPlugin(Star):
         self.controller_server: Optional[ControllerServer] = None
         self.server_host = None
         self.server_port = None
+        self.cleanup_task: Optional[asyncio.Task] = None  # 定时清理任务
         
         # 注册 FunctionTool 工具
         self._register_tools()
@@ -615,16 +687,67 @@ class WindowsControlPlugin(Star):
         
         if success:
             logger.info(f"Windows 控制插件初始化完成，监听: {self.server_host}:{self.server_port}")
+            # 启动定时清理任务
+            self.cleanup_task = asyncio.create_task(self._cleanup_screenshot_cache())
         else:
             logger.error("Windows 控制插件启动失败")
         
     async def terminate(self):
         """插件销毁"""
+        # 停止定时清理任务
+        if self.cleanup_task:
+            self.cleanup_task.cancel()
+            try:
+                await self.cleanup_task
+            except asyncio.CancelledError:
+                pass
+        
         if self.controller_server:
             await self.controller_server.stop()
         # 清除全局变量
         set_controller_server(None)
         logger.info("Windows 控制插件已卸载")
+        
+    async def _cleanup_screenshot_cache(self):
+        """
+        定时清理截图缓存目录
+        每小时清理一次，删除所有截图文件
+        """
+        while True:
+            try:
+                # 等待1小时
+                await asyncio.sleep(3600)
+                
+                # 获取截图缓存目录
+                from pathlib import Path
+                data_path = get_astrbot_data_path()
+                if isinstance(data_path, str):
+                    data_path = Path(data_path)
+                
+                temp_image_path = data_path / "temp" / "tool_images"
+                
+                if not temp_image_path.exists():
+                    continue
+                
+                # 删除所有截图文件
+                deleted_count = 0
+                for file_path in temp_image_path.glob("screenshot_*"):
+                    try:
+                        if file_path.is_file():
+                            file_path.unlink()
+                            deleted_count += 1
+                    except Exception as e:
+                        logger.warning(f"删除缓存文件失败 {file_path}: {e}")
+                
+                if deleted_count > 0:
+                    logger.info(f"已清理 {deleted_count} 个截图缓存文件")
+                    
+            except asyncio.CancelledError:
+                logger.info("截图缓存清理任务已停止")
+                break
+            except Exception as e:
+                logger.error(f"清理截图缓存时出错: {e}")
+                await asyncio.sleep(300)  # 出错后5分钟再试
         
     def _check_connection(self) -> Tuple[bool, str]:
         """检查连接状态"""
@@ -633,3 +756,59 @@ class WindowsControlPlugin(Star):
         if not self.controller_server.has_connected_client():
             return False, "没有本地控制端连接"
         return True, ""
+
+    @filter.llm_tool(name="view_image")
+    async def view_image(self, event: AstrMessageEvent, image_url: str):
+        """
+        查看网络图片，让 LLM 能够"看到"图片内容
+        
+        Args:
+            image_url: 图片的 URL 地址
+            
+        Returns:
+            CallToolResult 包含 ImageContent，LLM 可以直接解析图片
+        """
+        if not MCP_AVAILABLE:
+            return "错误：mcp 模块未安装，无法使用 view_image 工具"
+        
+        # 参数校验
+        if not image_url:
+            return CallToolResult(content=[TextContent(type="text", text="错误：image_url 参数不能为空")])
+        
+        try:
+            import aiohttp
+            
+            # 下载图片
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(image_url) as resp:
+                    if resp.status != 200:
+                        return CallToolResult(content=[TextContent(type="text", text=f"错误：下载图片失败，HTTP 状态码 {resp.status}")])
+                    
+                    # 获取 Content-Type
+                    content_type = resp.headers.get('Content-Type', 'image/jpeg')
+                    
+                    # 获取二进制数据
+                    image_data = await resp.read()
+                    
+                    if not image_data:
+                        return CallToolResult(content=[TextContent(type="text", text="错误：图片数据为空")])
+                    
+                    # 转为 base64 字符串
+                    base64_data = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # 确定 MIME 类型
+                    mime_type = content_type.split(';')[0].strip()
+                    if mime_type not in ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp']:
+                        mime_type = 'image/jpeg'
+                    
+                    # 返回 ImageContent 对象
+                    return CallToolResult(content=[
+                        ImageContent(type="image", data=base64_data, mimeType=mime_type)
+                    ])
+                    
+        except aiohttp.ClientError as e:
+            return CallToolResult(content=[TextContent(type="text", text=f"错误：网络请求失败 - {str(e)}")])
+        except Exception as e:
+            logger.error(f"view_image 工具执行失败: {str(e)}")
+            return CallToolResult(content=[TextContent(type="text", text=f"错误：{str(e)}")])
